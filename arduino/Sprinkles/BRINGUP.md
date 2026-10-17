@@ -52,8 +52,11 @@ before you flash anything.
 **Do:** wire to `esp_lcd_panel_draw_bitmap` from the BSP. Set brightness to 35.
 
 **Expect:** Sprinkles on screen, breathing, blinking every few seconds, tail
-swishing. She is drawn at 448 px inside the 466 circle, so there is a ~9 px
-black margin all round — that is the burn-in slack, not a mistake.
+swishing. The 64×64 world is scaled to 448 px and centred on the 466 circle
+of the Waveshare 1.75" panel. The gap between that square and the round
+bezel is the same background colour, and pixels outside the circle stay off,
+so the glass shows a round scene rather than a square inset. The 9 px of
+slack is still there: it is what the burn-in drift moves through.
 
 **If she's the wrong size or offset:** the blit is fine (it's tested), so it's
 the panel's own origin or a rotation setting in the BSP init.

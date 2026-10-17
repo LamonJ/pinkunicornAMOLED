@@ -24,7 +24,11 @@ extern "C" {
 
 #define GFX_W 64                      /* world is GFX_W x GFX_W        */
 #define GFX_SCALE 7                   /* -> 448 px on the panel        */
-#define GFX_PANEL 466                 /* physical round display        */
+#define GFX_PANEL 466                 /* Waveshare 1.75" AMOLED        */
+/* 466 is even, so the circle is centred on pixel 233 and the last row
+ * is one pixel short of a perfect diameter. That is the panel, not a crop. */
+#define GFX_CIRCLE_C (GFX_PANEL / 2)  /* 233 */
+#define GFX_CIRCLE_R (GFX_PANEL / 2)  /* radius 233, diameter 466       */
 #define GFX_OFFSET ((GFX_PANEL - GFX_W * GFX_SCALE) / 2)   /* == 9 */
 
 typedef uint32_t rgb_t;               /* 0x00RRGGBB */
@@ -83,8 +87,14 @@ double gfx_top_at(double cy, double rx, double ry, double dx);
 /* Burn-in drift: two mismatched slow cycles through the 9 px of slack. */
 void gfx_drift(double minutes, int *dx, int *dy);
 
-/* Nearest-neighbour 7x upscale into an RGB565 panel buffer.
- * panel must hold GFX_PANEL*GFX_PANEL uint16_t. */
+/* Nearest-neighbour 7x upscale into the round RGB565 panel.
+ * panel must hold GFX_PANEL*GFX_PANEL uint16_t.
+ *
+ * The world is a square. The glass is the Waveshare circle. Pixels outside
+ * that circle are left off (the corners are not on the panel). The gap
+ * between the 448 px square and the bezel is filled with the colour last
+ * passed to gfx_clear, so the scene meets the round edge instead of sitting
+ * in a smaller square. */
 void gfx_blit565(uint16_t *panel, int drift_x, int drift_y);
 
 #ifdef __cplusplus

@@ -5,6 +5,7 @@
 rgb_t  gfx_fb[GFX_W * GFX_W];
 rgb_t  gfx_alt[GFX_W * GFX_W];
 rgb_t *gfx_dst = gfx_fb;
+static rgb_t gfx_bg;                  /* last gfx_clear of the main buffer */
 
 void gfx_use_alt(int on)
 {
@@ -55,6 +56,9 @@ static rgb_t tone(rgb_t c)
 void gfx_clear(rgb_t c)
 {
     rgb_t v = c;
+    /* Only the main buffer is what the panel shows. Clearing the alt
+     * target (the flat cat, before she spins) must not repaint the bezel. */
+    if (gfx_dst == gfx_fb) gfx_bg = v;
     for (int i = 0; i < GFX_W * GFX_W; i++) gfx_dst[i] = v;
 }
 
@@ -231,27 +235,65 @@ void gfx_drift(double minutes, int *dx, int *dy)
     *dy = gfx_round(cos(minutes * 2 * M_PI / 23.0) * 8);
 }
 
+static uint16_t rgb565(rgb_t c)
+{
+    return (uint16_t)((((c >> 16) & 0xF8) << 8) |
+                      (((c >>  8) & 0xFC) << 3) |
+                      (( c        & 0xF8) >> 3));
+}
+
+/* Toward -infinity. C division truncates toward zero, which maps the
+ * pixels just left of the square onto world column 0 instead of -1. */
+static int floordiv(int n, int d)
+{
+    int q = n / d;
+    if (n % d < 0) q--;
+    return q;
+}
+
+static int isqrt_floor(int n)
+{
+    if (n <= 0) return 0;
+    int x = 0;
+    int bit = 1 << 30;
+    while (bit > n) bit >>= 2;
+    while (bit) {
+        int t = x + bit;
+        x >>= 1;
+        if (n >= t) { n -= t; x += bit; }
+        bit >>= 2;
+    }
+    return x;
+}
+
 void gfx_blit565(uint16_t *panel, int drift_x, int drift_y)
 {
-    memset(panel, 0, (size_t)GFX_PANEL * GFX_PANEL * sizeof(uint16_t));
-    for (int wy = 0; wy < GFX_W; wy++) {
-        for (int wx = 0; wx < GFX_W; wx++) {
-            rgb_t c = gfx_fb[wy * GFX_W + wx];
-            uint16_t p = (uint16_t)((((c >> 16) & 0xF8) << 8) |
-                                    (((c >>  8) & 0xFC) << 3) |
-                                    (( c        & 0xF8) >> 3));
-            int px0 = GFX_OFFSET + drift_x + wx * GFX_SCALE;
-            int py0 = GFX_OFFSET + drift_y + wy * GFX_SCALE;
-            for (int sy = 0; sy < GFX_SCALE; sy++) {
-                int y = py0 + sy;
-                if (y < 0 || y >= GFX_PANEL) continue;
-                uint16_t *row = panel + (size_t)y * GFX_PANEL;
-                for (int sx = 0; sx < GFX_SCALE; sx++) {
-                    int x = px0 + sx;
-                    if (x < 0 || x >= GFX_PANEL) continue;
-                    row[x] = p;
-                }
-            }
+    const uint16_t bg = rgb565(gfx_bg);
+    const int r2 = GFX_CIRCLE_R * GFX_CIRCLE_R;
+
+    for (int y = 0; y < GFX_PANEL; y++) {
+        uint16_t *row = panel + (size_t)y * GFX_PANEL;
+        int dy = y - GFX_CIRCLE_C;
+        int remain = r2 - dy * dy;
+        if (remain < 0) {
+            for (int x = 0; x < GFX_PANEL; x++) row[x] = 0;
+            continue;
         }
+        int half = isqrt_floor(remain);
+        int x0 = GFX_CIRCLE_C - half;
+        int x1 = GFX_CIRCLE_C + half;
+        if (x0 < 0) x0 = 0;
+        if (x1 >= GFX_PANEL) x1 = GFX_PANEL - 1;
+
+        for (int x = 0; x < x0; x++) row[x] = 0;
+        for (int x = x0; x <= x1; x++) {
+            int wx = floordiv(x - GFX_OFFSET - drift_x, GFX_SCALE);
+            int wy = floordiv(y - GFX_OFFSET - drift_y, GFX_SCALE);
+            rgb_t c = gfx_bg;
+            if (wx >= 0 && wy >= 0 && wx < GFX_W && wy < GFX_W)
+                c = gfx_fb[wy * GFX_W + wx];
+            row[x] = (c == gfx_bg) ? bg : rgb565(c);
+        }
+        for (int x = x1 + 1; x < GFX_PANEL; x++) row[x] = 0;
     }
 }

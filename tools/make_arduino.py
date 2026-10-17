@@ -29,9 +29,15 @@ def flatten(text):
     return re.sub(r'#include\s+"sprinkles/([^"]+)"', r'#include "\1"', text)
 
 def main():
+    # pin_config.h is board wiring, not generated from sprinkles/. The sketch
+    # folder is otherwise wiped and rewritten, so keep this file across a run.
+    pin_path = os.path.join(OUT, "pin_config.h")
+    pin = open(pin_path).read() if os.path.exists(pin_path) else None
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
     os.makedirs(OUT)
+    if pin is not None:
+        open(pin_path, "w").write(pin)
     for name in SHARED:
         src = os.path.join(ROOT, "sprinkles", name)
         open(os.path.join(OUT, name), "w").write(flatten(open(src).read()))

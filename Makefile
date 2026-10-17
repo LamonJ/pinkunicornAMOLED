@@ -8,7 +8,7 @@ LDLIBS  = -lm
 CORE    = sprinkles/gfx.c sprinkles/pet.c sprinkles/sprites.c sprinkles/wallclock.c
 GOLDEN ?= ../golden-frames
 
-all: test test-app test-clock golden
+all: test test-app test-clock test-blit golden
 
 test_pet: host/test_pet.c sprinkles/pet.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -21,6 +21,12 @@ test_clock: host/test_clock.c sprinkles/wallclock.c
 
 test-clock: test_clock
 	./test_clock
+
+test_blit: host/test_blit.c sprinkles/gfx.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+test-blit: test_blit
+	./test_blit
 
 test_app: host/test_app.c host/board_host.c $(CORE) sprinkles/app.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -36,7 +42,14 @@ golden: host_golden
 	./host_golden out
 	python3 host/diff.py out $(GOLDEN)
 
-clean:
-	rm -rf test_pet test_app test_clock host_golden out diff.png
+round_preview: host/round_preview.c $(CORE)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
-.PHONY: all test test-app test-clock golden clean
+round: round_preview
+	@mkdir -p out
+	./round_preview out
+
+clean:
+	rm -rf test_pet test_app test_clock test_blit host_golden round_preview out diff.png
+
+.PHONY: all test test-app test-clock test-blit golden round clean
