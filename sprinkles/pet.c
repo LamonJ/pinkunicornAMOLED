@@ -46,24 +46,18 @@ double pet_age_minutes(const pet_t *p, int64_t now_ms)
 
 int pet_sim_age(const pet_t *p, int64_t now_ms)
 {
-    /* Band starts. The egg is always 0. Each later form owns 25 points,
-     * and the top point of a band is withheld until she actually grows,
-     * so a blob who has waited out her 8 h still reads 24 until the feeding. */
-    static const int LO[ST_COUNT] = { 0, 0, 25, 50, 75 };
-    int hi, age;
-    double span, mins, u;
+    /* 25 years at 8 h gets her to 25. Every year after that is 22 h. */
+    const double young_h = 25.0 * PET_AGE_YOUNG_H;
+    double hours = pet_age_minutes(p, now_ms) / 60.0;
+    int age;
 
-    if (p->stage <= ST_EGG || p->stage >= ST_COUNT) return 0;
-
-    hi = (p->stage >= ST_ROYAL) ? 100 : LO[p->stage + 1] - 1;
-    span = (p->stage >= ST_ROYAL) ? PET_AGE_ROYAL_MIN : PET_STAGE_DWELL[p->stage];
-    mins = (double)(now_ms - p->stage_since_ms) / 60000.0 * p->speed;
-    if (mins < 0) mins = 0;
-    u = (span <= 0) ? 1.0 : mins / span;
-    if (u > 1.0) u = 1.0;
-
-    age = LO[p->stage] + (int)(u * (double)(hi - LO[p->stage]));
-    if (age < 0) age = 0;
+    if (hours < 0) hours = 0;
+    if (hours < young_h) {
+        age = (int)(hours / PET_AGE_YOUNG_H);
+        if (age > 24) age = 24;
+        return age;
+    }
+    age = 25 + (int)((hours - young_h) / PET_AGE_OLDER_H);
     if (age > 100) age = 100;
     return age;
 }

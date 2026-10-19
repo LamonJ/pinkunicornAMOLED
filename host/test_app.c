@@ -320,19 +320,19 @@ static void test_egg_tap(void)
 }
 
 /* ---- frame composition doesn't crash or leave state dirty ------------- */
-/* Egg is 0: one digit, top row ###, centred at x = 30.
- * A royal who has been one for 100 h is 100: the '1' top row is .#.,
- * and that glyph starts at x = 26. */
+/* A new pet is 0: one digit, top row ###, centred at x = 30.
+ * 200 h is 25: two digits, width 7, starting at x = 28, top row ###. */
 static void test_age_is_drawn(void)
 {
     boot(ST_EGG);
+    A.pet.born_ms = hb_now;
     app_frame(&A, 0, hb_now);
-    CHECK(gfx_fb[58 * GFX_W + 30] == C_COATHI, "egg screen shows age 0");
+    CHECK(gfx_fb[58 * GFX_W + 30] == C_COATHI, "a new egg shows age 0");
 
-    boot(ST_ROYAL);
+    boot(ST_BLOB);
+    A.pet.born_ms = hb_now - 200LL * 3600 * 1000;
     app_frame(&A, 0, hb_now);
-    CHECK(gfx_fb[58 * GFX_W + 27] == C_COATHI, "royal screen shows age 100");
-    CHECK(gfx_fb[58 * GFX_W + 26] != C_COATHI, "the 1 keeps its empty corner");
+    CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "200 h shows age 25");
 }
 
 static void test_frame_all_states(void)

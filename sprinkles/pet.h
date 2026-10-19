@@ -142,14 +142,11 @@ void   pet_tick(pet_t *p, int64_t now_ms, double rand01);
 
 double pet_age_minutes(const pet_t *p, int64_t now_ms);
 
-/* Simulated age, 0..100. 100 is the oldest she gets.
- *   0        egg
- *   0..24    little blob, across the 8 h before a feeding can grow her
- *   25..49   kitten, across 22 h
- *   50..74   unicorn, across 42 h
- *   75..100  royal unicat, across the next 48 h, then she stays at 100
- * The number does not enter the next band until a feeding actually grows her. */
-#define PET_AGE_ROYAL_MIN (48.0 * 60.0)
+/* Simulated age, 0..100, from time alive. 100 is as old as she gets.
+ * Each year from 0 until she turns 25 takes 8 hours.
+ * Each year from 25 to 100 takes 22 hours. */
+#define PET_AGE_YOUNG_H  8.0    /* hours per year while she is 0..24 */
+#define PET_AGE_OLDER_H 22.0    /* hours per year from 25 on          */
 int pet_sim_age(const pet_t *p, int64_t now_ms);
 mood_t pet_mood(const pet_t *p, bool eating);
 
