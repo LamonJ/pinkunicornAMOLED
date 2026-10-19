@@ -49,9 +49,11 @@
 #  include "TouchDrvCSTXXX.hpp"
 #endif
 
-/* RTC and IMU, also SensorLib. */
-#include "SensorPCF85063.hpp"
-#include "SensorQMI8658.hpp"
+/* RTC, also SensorLib. RtcDrv.hpp is the current umbrella; the old
+ * SensorPCF85063.hpp header only prints a deprecation warning and then
+ * includes the same driver. The IMU header is included only when USE_IMU
+ * is turned on, further down — this build does not start the QMI8658. */
+#include "RtcDrv.hpp"
 
 /* Audio: arduino-esp32's I2S class plus Espressif's ES8311 driver, which is
  * vendored next to this file (es8311.c/.h/es8311_reg.h, Apache-2.0, taken
@@ -428,6 +430,7 @@ extern "C" bool board_button_pressed(int which)
 #define USE_IMU 0
 
 #if USE_IMU
+#include "ImuDrv.hpp"
 static SensorQMI8658 qmi;
 static float imu_last_mag = 0;
 #endif
@@ -447,12 +450,15 @@ extern "C" bool board_picked_up(void)
     return false;
 #else
     if (!imu_ok) return false;
-    if (!qmi.getDataReady()) return false;
+    if (!qmi.isDataReady(static_cast<uint8_t>(ImuBase::DataReadyMask::ACCEL)))
+        return false;
 
-    float x = 0, y = 0, z = 0;
-    if (!qmi.getAccelerometer(x, y, z)) return false;
+    AccelerometerData accel;
+    if (!qmi.readAccel(accel)) return false;
 
-    float mag = sqrtf(x * x + y * y + z * z);
+    float mag = sqrtf(accel.mps2.x * accel.mps2.x +
+                      accel.mps2.y * accel.mps2.y +
+                      accel.mps2.z * accel.mps2.z);
     bool jumped = (imu_last_mag > 0.1f) && (fabsf(mag - imu_last_mag) > PICKUP_DELTA);
     imu_last_mag = mag;
     return jumped;
@@ -593,7 +599,7 @@ extern "C" void board_deep_sleep(void)
      * scanning entirely. The IMU in particular was running at 1 kHz. */
     if (touch_ok) touch.sleep();
 #if USE_IMU
-    if (imu_ok)   qmi.disableAccelerometer();
+    if (imu_ok)   qmi.disableAccel();
 #endif
 
     /* BOOT is the only wake source. PWR cannot be one - it lives behind the
@@ -759,10 +765,10 @@ extern "C" void board_init(void)
         /* 1000 Hz is what the vendor demo uses and it is wildly more than
          * this needs - we sample it twice a second to notice a toy being
          * picked up. Low-power 11 Hz is still five times our read rate. */
-        qmi.configAccelerometer(SensorQMI8658::ACC_RANGE_4G,
-                                SensorQMI8658::ACC_ODR_LOWPOWER_11Hz,
-                                SensorQMI8658::LPF_MODE_0);
-        qmi.enableAccelerometer();
+        qmi.configAccel(AccelFullScaleRange::FS_4G,
+                        11.0f,
+                        SensorQMI8658::LpfMode::MODE_0);
+        qmi.enableAccel();
         imu_ok = true;
         Serial.println("IMU OK");
     }
