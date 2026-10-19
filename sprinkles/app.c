@@ -76,8 +76,11 @@ void app_init(app_t *a, int64_t now_ms)
 {
     memset(a, 0, sizeof(*a));
     pet_init(&a->pet, now_ms);
-    a->sleep_after_s = 60;
-    a->nap_sleep_after_s = 20;
+    /* Three quiet minutes, then the panel sleeps. A minute was short enough
+     * that she blinked off while you were still watching. A nap still blanks
+     * sooner: once she has curled up there is less to look at. */
+    a->sleep_after_s = 180;
+    a->nap_sleep_after_s = 45;
     a->peek_dir = -1;
     a->idle_last_ms = now_ms;
     a->last_pet_tick_ms = now_ms;

@@ -189,8 +189,8 @@ static void test_nap_is_visible(void)
      * does - there is nothing to watch once she has settled. */
     app_button(&A, hb_now, 1);
     CHECK(A.pet.napping, "napped again");
-    seconds(25);
-    CHECK(A.screen_off, "and the screen is off within ~20 s of napping");
+    seconds(50);
+    CHECK(A.screen_off, "and the screen is off within ~45 s of napping");
 }
 
 static void test_nap_restores_energy(void)

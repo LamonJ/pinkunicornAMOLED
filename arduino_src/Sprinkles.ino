@@ -28,18 +28,11 @@ static app_t app;
 
 #define FRAME_MS 66            /* ~15 fps; a Tamagotchi needs no more */
 
-/* 1 = deep sleep, woken ONLY by the lower side button.
- *
- * Deep sleep by itself saves surprisingly little here, because the PMIC
- * keeps the display controller, touch chip, IMU and codec powered whatever
- * the ESP32 does. The saving comes from no longer NEEDING them: give up
- * touch-to-wake and pickup-to-wake and all four can be put away properly.
- *
- * The cost is that waking is a reboot rather than a resume - roughly a
- * second - and "press the button to wake her" becomes a rule a child has to
- * learn. Set to 0 for the old light-sleep behaviour, where a tap or a lift
- * wakes her instantly but she idles far heavier. */
-#define USE_DEEP_SLEEP 1
+/* 0 = light sleep. A tap on the glass, or the lower side button, turns the
+ * panel back on. Deep sleep (1) can only be woken by that button, because
+ * the touch controller is powered down with it — a finger on the glass does
+ * nothing, which reads as a dead toy. */
+#define USE_DEEP_SLEEP 0
 
 static int64_t last_frame, last_tick, last_save;
 static bool    touch_was_down = false;
@@ -456,6 +449,11 @@ after_input:;
         board_deep_sleep();          /* never returns; wakes as a fresh boot */
 #else
         board_sleep_until_touched();
+        /* The tap that woke us usually ended inside the sleep, so the main
+         * loop never sees a press and a release. Without this she would
+         * paint one frame and go straight back to sleep. */
+        app_touch(&app, board_now_ms(), 0, 0);
+        touch_was_down = false;
         last_frame = last_save = board_now_ms();
 #endif
     } else {
