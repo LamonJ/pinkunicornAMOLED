@@ -143,10 +143,18 @@ void   pet_tick(pet_t *p, int64_t now_ms, double rand01);
 double pet_age_minutes(const pet_t *p, int64_t now_ms);
 
 /* Simulated age, 0..100, from time alive. 100 is as old as she gets.
- * Each year from 0 until she turns 25 takes 8 hours.
- * Each year from 25 to 100 takes 22 hours. */
-#define PET_AGE_YOUNG_H  8.0    /* hours per year while she is 0..24 */
-#define PET_AGE_OLDER_H 22.0    /* hours per year from 25 on          */
+ * Each displayed year lasts:
+ *   0..24    20 minutes
+ *   25..49   2 hours
+ *   50..74   3 hours
+ *   75..99   5 hours
+ * and 100 stays. The year she is in decides the wait for the next one,
+ * so 24 lasts 20 minutes and 25 lasts 2 hours. */
+#define PET_AGE_BAND 25
+#define PET_AGE_M0   20.0             /* minutes per year, ages 0..24  */
+#define PET_AGE_M1  120.0             /* minutes per year, ages 25..49 */
+#define PET_AGE_M2  180.0             /* minutes per year, ages 50..74 */
+#define PET_AGE_M3  300.0             /* minutes per year, ages 75..99 */
 int pet_sim_age(const pet_t *p, int64_t now_ms);
 mood_t pet_mood(const pet_t *p, bool eating);
 

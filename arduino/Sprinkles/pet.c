@@ -46,20 +46,22 @@ double pet_age_minutes(const pet_t *p, int64_t now_ms)
 
 int pet_sim_age(const pet_t *p, int64_t now_ms)
 {
-    /* 25 years at 8 h gets her to 25. Every year after that is 22 h. */
-    const double young_h = 25.0 * PET_AGE_YOUNG_H;
-    double hours = pet_age_minutes(p, now_ms) / 60.0;
-    int age;
+    /* Each band is 25 birthdays. Crossing one lands on the next band's rate. */
+    const double span0 = PET_AGE_BAND * PET_AGE_M0;
+    const double span1 = PET_AGE_BAND * PET_AGE_M1;
+    const double span2 = PET_AGE_BAND * PET_AGE_M2;
+    const double span3 = PET_AGE_BAND * PET_AGE_M3;
+    double mins = pet_age_minutes(p, now_ms);
 
-    if (hours < 0) hours = 0;
-    if (hours < young_h) {
-        age = (int)(hours / PET_AGE_YOUNG_H);
-        if (age > 24) age = 24;
-        return age;
-    }
-    age = 25 + (int)((hours - young_h) / PET_AGE_OLDER_H);
-    if (age > 100) age = 100;
-    return age;
+    if (mins < 0) mins = 0;
+    if (mins < span0) return (int)(mins / PET_AGE_M0);
+    mins -= span0;
+    if (mins < span1) return 25 + (int)(mins / PET_AGE_M1);
+    mins -= span1;
+    if (mins < span2) return 50 + (int)(mins / PET_AGE_M2);
+    mins -= span2;
+    if (mins < span3) return 75 + (int)(mins / PET_AGE_M3);
+    return 100;
 }
 
 static void drain(int *pip, double *frac, double dt, double per)

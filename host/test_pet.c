@@ -328,9 +328,9 @@ static void test_save_restore_units(void)
           "a garbage stage is refused");
 }
 
-static int64_t hours_ms(double h)
+static int64_t mins_ms(double m)
 {
-    return (int64_t)(h * 3600.0 * 1000.0);
+    return (int64_t)(m * 60.0 * 1000.0);
 }
 
 static void test_age_label(void)
@@ -338,25 +338,38 @@ static void test_age_label(void)
     pet_t p; int64_t now = 100000;
     pet_init(&p, now);
     CHECK(pet_sim_age(&p, now) == 0, "a new pet is 0, got %d", pet_sim_age(&p, now));
-    CHECK(pet_sim_age(&p, now + hours_ms(7)) == 0, "7 h is still 0, got %d",
-          pet_sim_age(&p, now + hours_ms(7)));
-    CHECK(pet_sim_age(&p, now + hours_ms(8)) == 1, "8 h is 1, got %d",
-          pet_sim_age(&p, now + hours_ms(8)));
-    CHECK(pet_sim_age(&p, now + hours_ms(192)) == 24, "192 h is 24, got %d",
-          pet_sim_age(&p, now + hours_ms(192)));
-    CHECK(pet_sim_age(&p, now + hours_ms(199)) == 24, "the year of 24 lasts 8 h, got %d",
-          pet_sim_age(&p, now + hours_ms(199)));
-    CHECK(pet_sim_age(&p, now + hours_ms(200)) == 25, "200 h turns 25, got %d",
-          pet_sim_age(&p, now + hours_ms(200)));
-    CHECK(pet_sim_age(&p, now + hours_ms(221)) == 25, "25 lasts 22 h, got %d",
-          pet_sim_age(&p, now + hours_ms(221)));
-    CHECK(pet_sim_age(&p, now + hours_ms(222)) == 26, "222 h is 26, got %d",
-          pet_sim_age(&p, now + hours_ms(222)));
-    CHECK(pet_sim_age(&p, now + hours_ms(200 + 75 * 22)) == 100,
-          "75 older years reach 100, got %d",
-          pet_sim_age(&p, now + hours_ms(200 + 75 * 22)));
-    CHECK(pet_sim_age(&p, now + hours_ms(3000)) == 100,
-          "she stays at 100, got %d", pet_sim_age(&p, now + hours_ms(3000)));
+    CHECK(pet_sim_age(&p, now + mins_ms(19)) == 0, "19 min is still 0, got %d",
+          pet_sim_age(&p, now + mins_ms(19)));
+    CHECK(pet_sim_age(&p, now + mins_ms(20)) == 1, "20 min is 1, got %d",
+          pet_sim_age(&p, now + mins_ms(20)));
+    CHECK(pet_sim_age(&p, now + mins_ms(24 * 20)) == 24, "8 h is 24, got %d",
+          pet_sim_age(&p, now + mins_ms(24 * 20)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 - 1)) == 24,
+          "24 lasts 20 min, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 - 1)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20)) == 25, "500 min turns 25, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 119)) == 25,
+          "25 lasts 2 h, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 119)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 120)) == 26, "2 h later is 26, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 120)));
+
+    /* 25 years at 20 min, 25 at 2 h, then the 50s begin. */
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120)) == 50,
+          "after the 2 h years she is 50, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 180)) == 51,
+          "3 h into the 50s is 51, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 180)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 25 * 180)) == 75,
+          "after the 3 h years she is 75, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 25 * 180)));
+    CHECK(pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 25 * 180 + 25 * 300)) == 100,
+          "25 years at 5 h reach 100, got %d",
+          pet_sim_age(&p, now + mins_ms(25 * 20 + 25 * 120 + 25 * 180 + 25 * 300)));
+    CHECK(pet_sim_age(&p, now + mins_ms(100000)) == 100,
+          "she stays at 100, got %d", pet_sim_age(&p, now + mins_ms(100000)));
 }
 
 /* The interaction loop a four-year-old actually sees: something to do within
