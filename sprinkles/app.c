@@ -413,6 +413,36 @@ static void do_clean(app_t *a)
     else PLAY(SND_REFUSE);
 }
 
+/* One use, then the buttons get out of the way. The action itself waits
+ * a beat so the icons are gone before she moves. */
+static void queue_action(app_t *a, int64_t now_ms, int which)
+{
+    a->pressed = which;
+    a->press_t = (double)now_ms;
+    a->menu = false;
+    a->act_pending = which;
+    a->act_delay_t = 0;
+    PLAY(SND_PRESS);
+}
+
+/* A pile is drawn around (mess_x, 53). The hit is a little bigger than
+ * the sprite so a small finger still lands on it. */
+static bool on_mess(const app_t *a, double wx, double wy)
+{
+    for (int i = 0; i < a->pet.mess; i++) {
+        double dx = wx - a->pet.mess_x[i];
+        double dy = wy - 50.0;
+        if (dx * dx + dy * dy < 100.0) return true;
+    }
+    return false;
+}
+
+/* Hunger cake and its pips, top of the screen. */
+static bool on_cake_meter(double wx, double wy)
+{
+    return wx >= 8 && wx <= 34 && wy >= 6 && wy <= 16;
+}
+
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 {
     if (a->screen_off) { wake_screen(a, now_ms); return; }
@@ -429,18 +459,20 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
         if (d1 < best) { best = d1; hit = 1; }
         if (d2 < best) { best = d2; hit = 2; }
         if (hit) {
-            a->pressed = hit; a->press_t = (double)now_ms;
-            a->menu = false;                  /* one use, then out of the way */
             /* Acknowledge now, act in a second - see ACT_DELAY_MS. */
-            a->act_pending = hit;
-            a->act_delay_t = 0;
-            PLAY(SND_PRESS);
+            queue_action(a, now_ms, hit);
             return;
         }
     }
 
     if (a->pet.napping) { set_nap(a, false, now_ms); return; }
     if (a->pet.asleep) return;
+
+    /* The side buttons sit on the metal edge and a case can hide them.
+     * The cake meter and the piles are the same two actions, on things
+     * that are already on the glass. */
+    if (on_mess(a, wx, wy)) { queue_action(a, now_ms, 2); return; }
+    if (on_cake_meter(wx, wy)) { queue_action(a, now_ms, 1); return; }
 
     /* Petting her: she always reacts, the heart is rate-limited.
      *

@@ -222,6 +222,7 @@ void setup()
     Serial.printf ("RTC     : %s\n", board_rtc_ok()   ? "OK" : "FAILED");
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
+    Serial.println("tap the cake meter = feed | tap a pile = sweep");
     Serial.println("BOOT tap = menu | PWR tap = nap/wake | BOOT hold = nap");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",

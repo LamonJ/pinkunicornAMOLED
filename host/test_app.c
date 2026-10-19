@@ -104,6 +104,27 @@ static void test_nearest_button_wins(void)
     CHECK(app_menu_visible(&A), "and the menu stays open");
 }
 
+/* The side buttons can be hidden by a case. The cake meter feeds her and
+ * a tap on a pile sweeps it, with the same delayed action as the menu. */
+static void test_touch_cake_and_mess(void)
+{
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 18, 11);
+    CHECK(A.act_pending == 1, "cake meter queues a feed");
+    frames(1100);
+    CHECK(A.pet.hunger == 3, "tapping the cake meter feeds her, got %d",
+          A.pet.hunger);
+
+    boot(ST_ROYAL);
+    A.pet.mess = 1;
+    A.pet.mess_x[0] = 13;
+    app_touch(&A, hb_now, 13, 50);
+    CHECK(A.act_pending == 2, "a pile queues a sweep");
+    frames(1100);
+    CHECK(A.pet.mess == 0, "tapping the pile sweeps it");
+}
+
 static void test_tricks_stand_down_for_menu(void)
 {
     boot(ST_ROYAL);
@@ -336,6 +357,7 @@ int main(void)
         { "menu is summoned and stays",   test_menu_summon },
         { "using a button dismisses it",  test_menu_dismissed_by_use },
         { "nearest button wins",          test_nearest_button_wins },
+        { "cake and piles work by touch", test_touch_cake_and_mess },
         { "tricks stand down for menu",   test_tricks_stand_down_for_menu },
         { "cuddle never blocked",         test_cuddle_reaction_never_blocked },
         { "transformation flow",          test_transformation_flow },
