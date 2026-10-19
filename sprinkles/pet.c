@@ -44,6 +44,24 @@ double pet_age_minutes(const pet_t *p, int64_t now_ms)
     return (double)(now_ms - p->born_ms) / 60000.0 * p->speed;
 }
 
+void pet_age_label(const pet_t *p, int64_t now_ms, int *value, char *unit)
+{
+    double mins = pet_age_minutes(p, now_ms);
+    if (mins < 0) mins = 0;
+    if (mins >= 24.0 * 60.0) {
+        int days = (int)(mins / (24.0 * 60.0));
+        if (days > 999) days = 999;
+        *value = days;
+        *unit = 'd';
+    } else if (mins >= 60.0) {
+        *value = (int)(mins / 60.0);
+        *unit = 'h';
+    } else {
+        *value = (int)mins;
+        *unit = 'm';
+    }
+}
+
 static void drain(int *pip, double *frac, double dt, double per)
 {
     *frac += dt;
@@ -256,6 +274,15 @@ bool pet_restore(pet_t *p, const pet_save_t *s, int64_t now_ms,
                  int64_t rtc_ms, bool have_rtc, int64_t *away_ms_out)
 {
     if (s->version != PET_SAVE_VERSION) return false;
+    /* A blob that survived an upload can still be the right size and the
+     * wrong pet. Refuse anything that is not a stage and a set of meters
+     * this build understands, and leave the caller on the fresh egg. */
+    if ((unsigned)s->pet.stage >= ST_COUNT) return false;
+    if (s->pet.hunger < 0 || s->pet.hunger > 4) return false;
+    if (s->pet.happy  < 0 || s->pet.happy  > 4) return false;
+    if (s->pet.energy < 0 || s->pet.energy > 4) return false;
+    if (s->pet.mess < 0 || s->pet.mess > PET_MESS_MAX) return false;
+    if (s->age_ms < 0 || s->in_stage_ms < 0) return false;
 
     /* Only ever wall-clock minus wall-clock. If either side is missing we
      * simply say no time passed - she keeps her age and her meters, she just

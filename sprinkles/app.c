@@ -285,6 +285,17 @@ void app_advance(app_t *a, double dt, int64_t now_ms)
     }
 }
 
+static void draw_age(const app_t *a, int64_t now_ms)
+{
+    int value;
+    char unit;
+    double saved = gfx_dim;
+    gfx_dim = 1.0;
+    pet_age_label(&a->pet, now_ms, &value, &unit);
+    spr_age(value, unit);
+    gfx_dim = saved;
+}
+
 /* ---- composition ------------------------------------------------------ */
 void app_frame(app_t *a, double t, int64_t now_ms)
 {
@@ -302,11 +313,13 @@ void app_frame(app_t *a, double t, int64_t now_ms)
         double p = pet_age_minutes(&a->pet, now_ms) / PET_STAGE_AT[ST_BLOB];
         if (p > 1) p = 1;
         spr_egg(p, t, a->anim == AN_NUDGE && a->anim_t < NUDGE_MS);
+        draw_age(a, now_ms);
         return;
     }
 
     if (a->evo_on) {
         spr_evo(t, a->evo_t, a->evo_from, a->evo_to, a->pet.stage);
+        draw_age(a, now_ms);
         return;
     }
 
@@ -383,6 +396,7 @@ void app_frame(app_t *a, double t, int64_t now_ms)
     }
 
     if (menu) spr_buttons(&a->pet, now_ms, t, a->pressed == 1, a->pressed == 2);
+    draw_age(a, now_ms);
 }
 
 /* ---- actions ---------------------------------------------------------- */

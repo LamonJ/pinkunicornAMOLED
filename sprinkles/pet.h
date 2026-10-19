@@ -113,7 +113,11 @@ void   pet_init(pet_t *p, int64_t now_ms);
  * is exactly the bug this pair of functions exists to prevent: the blob
  * stores DURATIONS plus the wall time it was written, never a raw monotonic
  * stamp. Round-tripped in host/test_pet.c. */
-#define PET_SAVE_VERSION 3
+/* 4 discards pets saved by earlier builds. An Arduino upload leaves the
+ * NVS partition alone, so a version-3 blob was restoring a fully grown
+ * cat and the egg never appeared. A flash of this build starts at the egg.
+ * Later boots of the same build keep her. */
+#define PET_SAVE_VERSION 4
 
 typedef struct {
     uint32_t version;
@@ -137,6 +141,10 @@ bool pet_restore(pet_t *p, const pet_save_t *s, int64_t now_ms,
 void   pet_tick(pet_t *p, int64_t now_ms, double rand01);
 
 double pet_age_minutes(const pet_t *p, int64_t now_ms);
+
+/* The on-screen age. One unit, so it fits under her paws:
+ * minutes until an hour, hours until a day, then days. */
+void pet_age_label(const pet_t *p, int64_t now_ms, int *value, char *unit);
 mood_t pet_mood(const pet_t *p, bool eating);
 
 /* The next stage if she has been in this one long enough, else ST_COUNT. */

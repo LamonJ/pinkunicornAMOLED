@@ -66,6 +66,8 @@ cat_geom_t spr_cat(stage_t st, mood_t m, double t,
 
 void spr_egg(double progress, double t, int nudged);
 void spr_hud(const pet_t *p, int energy_only, double t);
+/* Age under her paws. value is 0..999, unit is 'm', 'h', or 'd'. */
+void spr_age(int value, char unit);
 void spr_mess(const pet_t *p);
 void spr_cupcake(double x, double y, int bites);
 void spr_broom(double x, double y);

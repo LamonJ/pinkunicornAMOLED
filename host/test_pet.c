@@ -314,11 +314,40 @@ static void test_save_restore_units(void)
     CHECK(pet_restore(&t2, &blob, boot, WALL - 99999, true, &away), "restores");
     CHECK(away == 0, "backwards clock clamps to zero, got %lld", (long long)away);
 
-    /* Wrong version is refused rather than misread. */
+    /* Wrong version is refused rather than misread. Version 3 is the blob
+     * an earlier flash left in NVS: it must not come back as a grown cat. */
     pet_save_t old_blob = blob; old_blob.version = 1;
     pet_t u;
     CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
           "a stale blob version is refused");
+    old_blob = blob; old_blob.version = 3; old_blob.pet.stage = ST_ROYAL;
+    CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
+          "a version-3 adult is refused");
+    old_blob = blob; old_blob.pet.stage = (stage_t)99;
+    CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
+          "a garbage stage is refused");
+}
+
+static void test_age_label(void)
+{
+    pet_t p; int64_t now = 100000; int value = -1; char unit = '?';
+    pet_init(&p, now);
+
+    pet_age_label(&p, now, &value, &unit);
+    CHECK(value == 0 && unit == 'm', "a new pet is 0m, got %d%c", value, unit);
+
+    pet_age_label(&p, now + 45LL * 60 * 1000, &value, &unit);
+    CHECK(value == 45 && unit == 'm', "45 min stays in minutes, got %d%c",
+          value, unit);
+
+    pet_age_label(&p, now + 90LL * 60 * 1000, &value, &unit);
+    CHECK(value == 1 && unit == 'h', "90 min is 1h, got %d%c", value, unit);
+
+    pet_age_label(&p, now + 26LL * 3600 * 1000, &value, &unit);
+    CHECK(value == 1 && unit == 'd', "26 h is 1d, got %d%c", value, unit);
+
+    pet_age_label(&p, now + 100LL * 3600 * 1000, &value, &unit);
+    CHECK(value == 4 && unit == 'd', "100 h is 4d, got %d%c", value, unit);
 }
 
 /* The interaction loop a four-year-old actually sees: something to do within
@@ -389,6 +418,7 @@ int main(void)
         { "mess caps and clears",      test_mess_cap },
         { "catch-up == stepwise",      test_catch_up_equals_stepwise },
         { "save/restore units",        test_save_restore_units },
+        { "age label",                 test_age_label },
         { "graded hunger and mess",    test_graded_rates },
         { "mood",                      test_mood },
     };

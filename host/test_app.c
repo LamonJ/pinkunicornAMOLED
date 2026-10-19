@@ -320,6 +320,20 @@ static void test_egg_tap(void)
 }
 
 /* ---- frame composition doesn't crash or leave state dirty ------------- */
+/* 100 h old, so the label is "4d". The '4' glyph's top row is #.# and the
+ * readout is centred on y = 58. */
+static void test_age_is_drawn(void)
+{
+    boot(ST_EGG);
+    app_frame(&A, 0, hb_now);
+    CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "egg screen shows her age");
+
+    boot(ST_ROYAL);
+    app_frame(&A, 0, hb_now);
+    CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "grown screen shows her age");
+    CHECK(gfx_fb[58 * GFX_W + 29] != C_COATHI, "the gap in the 4 stays empty");
+}
+
 static void test_frame_all_states(void)
 {
     struct { const char *name; stage_t st; int nap, menu, roll, peek, evo; } cases[] = {
@@ -369,6 +383,7 @@ int main(void)
         { "peek pushes roll out",         test_peek_pushes_roll_out },
         { "egg can be tapped out",        test_egg_tap },
         { "every state composes clean",   test_frame_all_states },
+        { "age is drawn",                 test_age_is_drawn },
     };
     for (unsigned i = 0; i < sizeof tests / sizeof *tests; i++) {
         int before = fails;
