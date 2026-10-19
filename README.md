@@ -60,7 +60,7 @@ How full she is.
 
 ![Cake meter](docs/meters/cake.png)
 
-It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake icon, or the cake at the top of the screen, to feed her.
+It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake meter to feed her.
 
 ### Moon
 
