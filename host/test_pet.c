@@ -330,24 +330,41 @@ static void test_save_restore_units(void)
 
 static void test_age_label(void)
 {
-    pet_t p; int64_t now = 100000; int value = -1; char unit = '?';
+    pet_t p; int64_t now = 100000;
     pet_init(&p, now);
+    CHECK(pet_sim_age(&p, now) == 0, "an egg is 0, got %d", pet_sim_age(&p, now));
 
-    pet_age_label(&p, now, &value, &unit);
-    CHECK(value == 0 && unit == 'm', "a new pet is 0m, got %d%c", value, unit);
+    p.stage = ST_BLOB;
+    p.stage_since_ms = now;
+    CHECK(pet_sim_age(&p, now) == 0, "a new blob is still 0, got %d",
+          pet_sim_age(&p, now));
+    CHECK(pet_sim_age(&p, now + (int64_t)(PET_STAGE_DWELL[ST_BLOB] * 60000)) == 24,
+          "a blob who has waited out 8 h is 24, got %d",
+          pet_sim_age(&p, now + (int64_t)(PET_STAGE_DWELL[ST_BLOB] * 60000)));
 
-    pet_age_label(&p, now + 45LL * 60 * 1000, &value, &unit);
-    CHECK(value == 45 && unit == 'm', "45 min stays in minutes, got %d%c",
-          value, unit);
+    p.stage = ST_KITTEN;
+    p.stage_since_ms = now;
+    CHECK(pet_sim_age(&p, now) == 25, "a new kitten is 25, got %d",
+          pet_sim_age(&p, now));
+    CHECK(pet_sim_age(&p, now + (int64_t)(PET_STAGE_DWELL[ST_KITTEN] * 60000)) == 49,
+          "a kitten at the end of 22 h is 49, got %d",
+          pet_sim_age(&p, now + (int64_t)(PET_STAGE_DWELL[ST_KITTEN] * 60000)));
 
-    pet_age_label(&p, now + 90LL * 60 * 1000, &value, &unit);
-    CHECK(value == 1 && unit == 'h', "90 min is 1h, got %d%c", value, unit);
+    p.stage = ST_UNICORN;
+    p.stage_since_ms = now;
+    CHECK(pet_sim_age(&p, now) == 50, "a new unicorn is 50, got %d",
+          pet_sim_age(&p, now));
 
-    pet_age_label(&p, now + 26LL * 3600 * 1000, &value, &unit);
-    CHECK(value == 1 && unit == 'd', "26 h is 1d, got %d%c", value, unit);
-
-    pet_age_label(&p, now + 100LL * 3600 * 1000, &value, &unit);
-    CHECK(value == 4 && unit == 'd', "100 h is 4d, got %d%c", value, unit);
+    p.stage = ST_ROYAL;
+    p.stage_since_ms = now;
+    CHECK(pet_sim_age(&p, now) == 75, "a new royal is 75, got %d",
+          pet_sim_age(&p, now));
+    CHECK(pet_sim_age(&p, now + (int64_t)(PET_AGE_ROYAL_MIN * 60000)) == 100,
+          "48 h as royal is 100, got %d",
+          pet_sim_age(&p, now + (int64_t)(PET_AGE_ROYAL_MIN * 60000)));
+    CHECK(pet_sim_age(&p, now + 100LL * 3600 * 1000) == 100,
+          "she stays at 100, got %d",
+          pet_sim_age(&p, now + 100LL * 3600 * 1000));
 }
 
 /* The interaction loop a four-year-old actually sees: something to do within

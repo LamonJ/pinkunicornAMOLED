@@ -244,36 +244,29 @@ static const char *AGE_6[] = { "###", "#..", "###", "#.#", "###" };
 static const char *AGE_7[] = { "###", "..#", "..#", ".#.", ".#." };
 static const char *AGE_8[] = { "###", "#.#", "###", "#.#", "###" };
 static const char *AGE_9[] = { "###", "#.#", "###", "..#", "###" };
-static const char *AGE_M[] = { "...", ".##", "#.#", "#.#", "#.#" };
-static const char *AGE_H[] = { "#..", "#..", "##.", "#.#", "#.#" };
-static const char *AGE_D[] = { "..#", "..#", ".##", "#.#", ".##" };
 
-void spr_age(int value, char unit)
+void spr_age(int value)
 {
     static const char **DIGIT[] = {
         AGE_0, AGE_1, AGE_2, AGE_3, AGE_4, AGE_5, AGE_6, AGE_7, AGE_8, AGE_9
     };
-    const char **u = AGE_M;
     int v = value;
     int digits[3];
     int n = 0;
     int width, x, i;
 
     if (v < 0) v = 0;
-    if (v > 999) v = 999;
-    if (unit == 'h') u = AGE_H;
-    else if (unit == 'd') u = AGE_D;
+    if (v > 100) v = 100;
 
     if (v == 0) digits[n++] = 0;
     else while (v > 0 && n < 3) { digits[n++] = v % 10; v /= 10; }
 
-    width = (n + 1) * 4 - 1;
+    width = n * 4 - 1;
     x = (GFX_W - width) / 2;
     for (i = n - 1; i >= 0; i--) {
         map1(x, 58, DIGIT[digits[i]], 5, C_COATHI);
         x += 4;
     }
-    map1(x, 58, u, 5, C_COATHI);
 }
 
 void spr_hud(const pet_t *p, int energy_only, double t)

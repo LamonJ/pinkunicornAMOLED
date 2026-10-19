@@ -320,18 +320,19 @@ static void test_egg_tap(void)
 }
 
 /* ---- frame composition doesn't crash or leave state dirty ------------- */
-/* 100 h old, so the label is "4d". The '4' glyph's top row is #.# and the
- * readout is centred on y = 58. */
+/* Egg is 0: one digit, top row ###, centred at x = 30.
+ * A royal who has been one for 100 h is 100: the '1' top row is .#.,
+ * and that glyph starts at x = 26. */
 static void test_age_is_drawn(void)
 {
     boot(ST_EGG);
     app_frame(&A, 0, hb_now);
-    CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "egg screen shows her age");
+    CHECK(gfx_fb[58 * GFX_W + 30] == C_COATHI, "egg screen shows age 0");
 
     boot(ST_ROYAL);
     app_frame(&A, 0, hb_now);
-    CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "grown screen shows her age");
-    CHECK(gfx_fb[58 * GFX_W + 29] != C_COATHI, "the gap in the 4 stays empty");
+    CHECK(gfx_fb[58 * GFX_W + 27] == C_COATHI, "royal screen shows age 100");
+    CHECK(gfx_fb[58 * GFX_W + 26] != C_COATHI, "the 1 keeps its empty corner");
 }
 
 static void test_frame_all_states(void)

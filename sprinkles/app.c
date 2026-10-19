@@ -287,12 +287,9 @@ void app_advance(app_t *a, double dt, int64_t now_ms)
 
 static void draw_age(const app_t *a, int64_t now_ms)
 {
-    int value;
-    char unit;
     double saved = gfx_dim;
     gfx_dim = 1.0;
-    pet_age_label(&a->pet, now_ms, &value, &unit);
-    spr_age(value, unit);
+    spr_age(pet_sim_age(&a->pet, now_ms));
     gfx_dim = saved;
 }
 
