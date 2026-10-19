@@ -2,6 +2,46 @@
 
 Milestones 2 and 3 of `sprinkles-port-spec.md`, done and verified.
 
+## Age
+
+The number under her paws runs from 0 to 100. 100 stays. Each year lasts:
+
+| Age | Each year lasts |
+|---|---|
+| 0–24 | 20 minutes |
+| 25–49 | 2 hours |
+| 50–74 | 3 hours |
+| 75–99 | 5 hours |
+| 100 | stays |
+
+She turns 25 after 8 hours 20 minutes, 50 after another 50 hours, 75 after another 75 hours, and 100 after another 125 hours.
+
+The pictures are one year inside each band: 12, 37, 62, and 100. Her shape still changes when you feed her after she has been in the current form long enough, so the number does not pick the body.
+
+### 0–24
+
+20 minutes a year.
+
+![Age 12, the little blob](docs/age/0-24.png)
+
+### 25–49
+
+2 hours a year.
+
+![Age 37, the kitten](docs/age/25-49.png)
+
+### 50–74
+
+3 hours a year.
+
+![Age 62, the unicorn](docs/age/50-74.png)
+
+### 75–100
+
+5 hours a year, then she stays at 100.
+
+![Age 100, the royal unicat](docs/age/75-100.png)
+
 ## What's here
 
     sprinkles/gfx.[ch]        64x64 pixel world + primitives
