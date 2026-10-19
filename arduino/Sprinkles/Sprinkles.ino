@@ -1,15 +1,18 @@
 /* Sprinkles.ino — a unicorn cat for a five-year-old.
  *
- * Open this folder in Arduino IDE and hit Upload. Board: "ESP32S3 Dev Module".
+ * This folder is the sketch. Open Sprinkles.ino and Upload.
+ * Board: "ESP32S3 Dev Module" for the Waveshare ESP32-S3-Touch-AMOLED-1.75.
  * Settings that matter:
  *   Flash Size          16MB (128Mb)
  *   PSRAM               OPI PSRAM        <- required, the frame buffer needs it
  *   Partition Scheme    16M Flash (3MB APP/9.9MB FATFS) or similar
  *   USB CDC On Boot     Enabled          <- so Serial.println works
  *
+ * Library Manager, once: "GFX Library for Arduino", "SensorLib", "XPowersLib".
+ * pin_config.h is already in this folder.
+ *
  * All the logic lives in the .c files next to this one and is verified on a
- * PC: 128 unit checks and 28 pixel-exact reference frames. The only unfinished
- * work is the hardware glue in board_arduino.cpp — see BRINGUP.md.
+ * PC. The hardware glue is board_arduino.cpp — see BRINGUP.md.
  */
 #include <Arduino.h>
 

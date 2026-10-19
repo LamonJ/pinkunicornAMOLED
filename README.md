@@ -50,10 +50,14 @@ extension's self-repair behaviour.
 
 ### Arduino IDE
 
-    python3 tools/make_arduino.py
+The sketch you flash is already in the repo:
 
-Writes `arduino/Sprinkles/` with the includes flattened, because Arduino only
-compiles files in the sketch root. Open `Sprinkles.ino` and Upload.
+    arduino/Sprinkles/Sprinkles.ino
+
+That folder has the `.ino`, the board code, `pin_config.h` for the Waveshare
+ESP32-S3-Touch-AMOLED-1.75, and the scene code. Open it and Upload. You do
+not copy pins in from the Waveshare examples, and you do not run a generator
+before the first flash.
 
 Board: **ESP32S3 Dev Module**. Settings that matter:
 
@@ -61,9 +65,15 @@ Board: **ESP32S3 Dev Module**. Settings that matter:
 |---|---|
 | Flash Size | 16MB (128Mb) |
 | PSRAM | **OPI PSRAM** — required, the frame buffer needs it |
+| Partition Scheme | 16M Flash (3MB APP/9.9MB FATFS), or another 16MB scheme |
 | USB CDC On Boot | Enabled, so `Serial` works |
 
-Re-run the generator after editing anything under `sprinkles/`.
+Install these three from Library Manager: **GFX Library for Arduino**,
+**SensorLib**, **XPowersLib**.
+
+`python3 tools/make_arduino.py` rewrites `arduino/Sprinkles/` from
+`sprinkles/` and `arduino_src/` after you edit those. The sketch folder is
+what a download should open.
 
 ### ESP-IDF
 
@@ -110,7 +120,7 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | Display | Arduino_GFX, `Arduino_ESP32QSPI` + `Arduino_CO5300` |
 | Touch | SensorLib `TouchDrvCST92xx`, mirrored X and Y |
 | Audio | `ESP_I2S` + Espressif's ES8311 driver (vendored), PA on GPIO46 |
-| RTC | SensorLib `SensorPCF85063`, seeded from `__DATE__` if never set |
+| RTC | SensorLib `RtcDrv` / PCF85063, seeded from `__DATE__` if never set |
 | IMU | SensorLib `SensorQMI8658`, pickup by acceleration delta |
 | BOOT button | GPIO0, active low |
 | PWR button | TCA9554 P4 at 0x20, **active high** |
@@ -120,8 +130,7 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | Grown-up screen | both buttons held 5 s, native-resolution text |
 
 **Libraries to install:** *GFX Library for Arduino*, *SensorLib* and *XPowersLib*.
-`pin_config.h` must be copied in from
-`examples/arduino/libraries/Mylibrary/`.
+`pin_config.h` is already in `arduino/Sprinkles/`.
 
 `board_esp32.c` is the ESP-IDF variant and still has its `TODO(bsp)` holes —
 the Arduino path is the maintained one.

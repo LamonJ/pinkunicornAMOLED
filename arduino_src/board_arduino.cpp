@@ -22,17 +22,14 @@
 /* Display: the same stack Waveshare's own Arduino examples use.
  *
  * Install via Library Manager: "GFX Library for Arduino" (moononournation).
- * Then COPY pin_config.h into this sketch folder from:
- *   examples/arduino/libraries/Mylibrary/pin_config.h
- *
- * Besides the display pins it also gives you, for the holes still to fill:
+ * pin_config.h is already in this sketch folder. It is the Waveshare
+ * ESP32-S3-Touch-AMOLED-1.75 wiring:
  *   TP_INT 11, TP_RESET 40          touch
  *   I2S: MCLK 42, BCLK 9, WS 45, DO 10, DI 8
  *   PA 46                           speaker amp enable - the audio stays
  *                                   silent until this is driven high
  *   XPOWERS_CHIP_AXP2101            the PMIC, via XPowersLib
- *
- * Use their file rather than transcribing pin numbers. */
+ */
 #include "Arduino_GFX_Library.h"
 
 /* Touch: CST9217 via SensorLib (lewisxhe). Library Manager -> "SensorLib".
