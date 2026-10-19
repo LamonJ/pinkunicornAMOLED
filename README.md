@@ -42,6 +42,34 @@ The pictures are one year inside each band: 12, 37, 62, and 100. Her shape still
 
 ![Age 100, the royal unicat](docs/age/75-100.png)
 
+## Meters
+
+Three bars sit above her. Each one has four pips.
+
+### Heart
+
+Happiness.
+
+![Heart meter](docs/meters/heart.png)
+
+It falls when the cake bar is under 2, when there is poop on the floor, or while she is asleep. Sleep slows that drop. While she is awake, the cake bar is at 2 or more, and the floor is clean, a pip comes back about every 15 minutes. Petting her can add one, at most once every 10 seconds, until the bar is full. Left in a bad state, one pip takes about 3 hours 10 minutes to fall off.
+
+### Cake
+
+How full she is.
+
+![Cake meter](docs/meters/cake.png)
+
+It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake icon, or the cake at the top of the screen, to feed her.
+
+### Moon
+
+Energy.
+
+![Moon meter](docs/meters/moon.png)
+
+It falls while she is awake, about one pip every 3 hours 50 minutes. A nap fills it, about one pip every 3 minutes. At empty she falls asleep.
+
 ## What's here
 
     sprinkles/gfx.[ch]        64x64 pixel world + primitives
