@@ -293,6 +293,8 @@ static const char *GLY_N[] = { "#.#", "##.", "#.#", "#.#", "#.#" };
 static const char *GLY_E[] = { "###", "#..", "##.", "#..", "###" };
 static const char *GLY_W[] = { "#.#", "#.#", "###", "#.#", "#.#" };
 static const char *GLY_G[] = { "###", "#..", "##.", "#.#", "###" };
+static const char *GLY_M[] = { "#.#", "###", "#.#", "#.#", "#.#" };
+static const char *GLY_U[] = { "#.#", "#.#", "#.#", "#.#", "###" };
 static const char *XEYE[]  = { "#.#", ".#.", "#.#" };
 
 static void word(int x, int y, const char **const *glyphs, int n, rgb_t c)
@@ -301,6 +303,12 @@ static void word(int x, int y, const char **const *glyphs, int n, rgb_t c)
         map1(x, y, glyphs[i], 5, c);
         x += 4;
     }
+}
+
+void spr_muted(void)
+{
+    const char **w[4] = { GLY_M, GLY_U, GLY_T, GLY_E };
+    word(24, 18, w, 4, C_STAR);
 }
 
 void spr_dead(double t)

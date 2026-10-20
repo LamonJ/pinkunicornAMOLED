@@ -55,6 +55,7 @@ static const spr_note_t SND_DIE[]      = { {420,240},{280,280},{160,360} };
 /* Acknowledges the press itself, since the action it triggers is a second
  * behind. Without this the button feels dead for that whole second. */
 static const spr_note_t SND_PRESS[]    = { {1300,90},{1000,120} };
+static const spr_note_t SND_UNMUTE[]   = { {880,140},{1320,200} };
 
 #define PLAY(x) board_beep((x), (int)(sizeof(x)/sizeof(spr_note_t)))
 
@@ -338,6 +339,15 @@ static void draw_age(const app_t *a, int64_t now_ms)
     gfx_dim = saved;
 }
 
+static void draw_mute(const app_t *a)
+{
+    if (a->pet.sound) return;
+    double saved = gfx_dim;
+    gfx_dim = 1.0;
+    spr_muted();
+    gfx_dim = saved;
+}
+
 /* ---- composition ------------------------------------------------------ */
 void app_frame(app_t *a, double t, int64_t now_ms)
 {
@@ -355,6 +365,7 @@ void app_frame(app_t *a, double t, int64_t now_ms)
         gfx_dim = 1.0;
         spr_dead(t);
         gfx_dim = 1.0;
+        draw_mute(a);
         return;
     }
 
@@ -363,12 +374,14 @@ void app_frame(app_t *a, double t, int64_t now_ms)
         if (p > 1) p = 1;
         spr_egg(p, t, a->anim == AN_NUDGE && a->anim_t < NUDGE_MS);
         draw_age(a, now_ms);
+        draw_mute(a);
         return;
     }
 
     if (a->evo_on) {
         spr_evo(t, a->evo_t, a->evo_from, a->evo_to, a->pet.stage);
         draw_age(a, now_ms);
+        draw_mute(a);
         return;
     }
 
@@ -446,6 +459,7 @@ void app_frame(app_t *a, double t, int64_t now_ms)
 
     if (menu) spr_buttons(&a->pet, now_ms, t, a->pressed == 1, a->pressed == 2);
     draw_age(a, now_ms);
+    draw_mute(a);
 }
 
 /* ---- actions ---------------------------------------------------------- */
@@ -519,6 +533,37 @@ static bool on_cake_meter(double wx, double wy)
     return wx >= 8 && wx <= 34 && wy >= 6 && wy <= 16;
 }
 
+/* A still finger. Sliding off cancels it, and it only lands once per press. */
+bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
+{
+    if (!down) {
+        a->hold_down = false;
+        a->hold_fired = false;
+        return false;
+    }
+    if (!a->hold_down) {
+        a->hold_down = true;
+        a->hold_fired = false;
+        a->hold_at = now_ms;
+        a->hold_x = x;
+        a->hold_y = y;
+        return false;
+    }
+    if (a->hold_fired) return false;
+    double dx = x - a->hold_x, dy = y - a->hold_y;
+    if (dx * dx + dy * dy > 25.0) {
+        a->hold_fired = true;            /* a drag is not a mute */
+        return false;
+    }
+    if (now_ms - a->hold_at < APP_HOLD_MS) return false;
+
+    a->hold_fired = true;
+    a->pet.sound = !a->pet.sound;
+    board_audio_enable(a->pet.sound);
+    if (a->pet.sound) PLAY(SND_UNMUTE);
+    return true;
+}
+
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 {
     if (a->screen_off) { wake_screen(a, now_ms); return; }
@@ -528,7 +573,10 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 
     if (a->pet.stage == ST_DEAD) {
         if (wx >= HATCH_X0 && wx <= HATCH_X1 && wy >= HATCH_Y0 && wy <= HATCH_Y1) {
+            bool hear = a->pet.sound;    /* mute is the speaker, not the pet */
             app_init(a, now_ms);
+            a->pet.sound = hear;
+            board_audio_enable(hear);
             PLAY(SND_STAGE);
         }
         return;

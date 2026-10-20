@@ -68,6 +68,8 @@ void spr_egg(double progress, double t, int nudged);
 void spr_hud(const pet_t *p, int energy_only, double t);
 /* Age under her paws. value is 0..100, drawn with no unit. */
 void spr_age(int value);
+/* The word MUTE, drawn under the meters while the speaker is off. */
+void spr_muted(void);
 /* Lying still, X eyes, a slow sparkle, and the new-egg button. */
 void spr_dead(double t);
 void spr_mess(const pet_t *p);

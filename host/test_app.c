@@ -11,6 +11,7 @@ extern double  hb_rand_ring[8];
 extern int     hb_rand_ring_n;
 extern int     hb_rand_i;
 extern int     hb_beeps, hb_slept;
+extern bool    hb_audio;
 extern spr_note_t hb_last_beep[48];
 extern int     hb_last_beep_n;
 
@@ -402,6 +403,52 @@ static void test_birthday_tune(void)
     CHECK(hb_beeps == before, "a dead pet does not get a birthday tune");
 }
 
+/* A still hold mutes. Another hold brings the sound back. The word MUTE
+ * is on screen the whole time it is quiet, and a new egg keeps the choice. */
+static void test_hold_mutes(void)
+{
+    boot(ST_ROYAL);
+    int64_t t = hb_now;
+    int beeps = hb_beeps;
+    CHECK(A.pet.sound && hb_audio, "sound starts on");
+    CHECK(!app_hold(&A, t, 1, 30, 30), "putting the finger down is not a mute");
+    CHECK(!app_hold(&A, t + APP_HOLD_MS - 1, 1, 31, 30), "a short hold waits");
+    CHECK(A.pet.sound, "still heard");
+    CHECK(app_hold(&A, t + APP_HOLD_MS, 1, 31, 31), "the long hold mutes");
+    CHECK(!A.pet.sound && !hb_audio, "speaker is off");
+    CHECK(hb_beeps == beeps, "muting itself is silent");
+    CHECK(!app_hold(&A, t + APP_HOLD_MS + 400, 1, 31, 31), "holding longer does not toggle again");
+    CHECK(A.hold_fired, "the release should not also be a tap");
+
+    app_frame(&A, 0, hb_now);
+    CHECK(gfx_fb[18 * GFX_W + 24] == C_STAR, "MUTE is drawn");
+    CHECK(gfx_dim == 1.0, "the label restores brightness");
+
+    app_hold(&A, t + 2000, 0, 0, 0);
+    CHECK(!app_hold(&A, t + 2100, 1, 20, 20), "finger down again");
+    CHECK(!A.pet.sound, "not yet");
+    beeps = hb_beeps;
+    CHECK(app_hold(&A, t + 2100 + APP_HOLD_MS, 1, 20, 21), "the second hold unmutes");
+    CHECK(A.pet.sound && hb_audio, "speaker is back");
+    CHECK(hb_beeps == beeps + 1, "unmuting plays a note");
+
+    /* A slide is not a mute. */
+    app_hold(&A, t + 4000, 0, 0, 0);
+    app_hold(&A, t + 4100, 1, 10, 10);
+    CHECK(!app_hold(&A, t + 4100 + APP_HOLD_MS, 1, 40, 10), "a drag does not mute");
+    CHECK(A.pet.sound, "still on after the drag");
+
+    boot(ST_DEAD);
+    A.pet.happy = 0;
+    app_hold(&A, hb_now, 1, 32, 40);
+    app_hold(&A, hb_now + APP_HOLD_MS, 1, 32, 40);
+    CHECK(!A.pet.sound, "muted on the dead screen");
+    app_hold(&A, hb_now + APP_HOLD_MS + 50, 0, 0, 0);
+    app_touch(&A, hb_now + APP_HOLD_MS + 80, 32, 50);
+    CHECK(A.pet.stage == ST_EGG, "hatch still starts an egg");
+    CHECK(!A.pet.sound, "and the speaker stays muted");
+}
+
 /* Full bars still take a cake. Each one costs a heart. The fourth kills,
  * and the hatch button is the only way back to an egg. */
 static void test_overfeed_and_hatch(void)
@@ -506,6 +553,7 @@ int main(void)
         { "every state composes clean",   test_frame_all_states },
         { "age is drawn",                 test_age_is_drawn },
         { "birthday tune",                test_birthday_tune },
+        { "hold mutes",                   test_hold_mutes },
         { "overfeed and hatch",           test_overfeed_and_hatch },
     };
     for (unsigned i = 0; i < sizeof tests / sizeof *tests; i++) {

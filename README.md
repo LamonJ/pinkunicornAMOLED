@@ -4,7 +4,11 @@ Milestones 2 and 3 of `sprinkles-port-spec.md`, done and verified.
 
 ## Age
 
-The number under her paws runs from 0 to 100. 100 stays. When that number goes up she plays Happy Birthday, about thirteen seconds. Each year lasts:
+The number under her paws runs from 0 to 100. 100 stays. When that number goes up she plays Happy Birthday, about thirteen seconds.
+
+Hold a finger still on the glass for a moment to mute. The word MUTE shows under the meters until you hold again.
+
+Each year lasts:
 
 | Age | Each year lasts |
 |---|---|

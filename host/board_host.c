@@ -15,6 +15,7 @@ int board_drift_x = 0, board_drift_y = 0;
 int board_touch_raw_x = -1, board_touch_raw_y = -1;
 int      hb_rand_i = 0;   /* tests reset this; it must not leak between them */
 int      hb_beeps = 0;
+bool     hb_audio = true;
 spr_note_t   hb_last_beep[48];
 int      hb_last_beep_n = 0;
 int      hb_pushes = 0;
@@ -42,7 +43,7 @@ void board_beep(const spr_note_t *n, int c)
     hb_last_beep_n = c > 48 ? 48 : c;
     memcpy(hb_last_beep, n, (size_t)hb_last_beep_n * sizeof(spr_note_t));
 }
-void board_audio_enable(bool on) { (void)on; }
+void board_audio_enable(bool on) { hb_audio = on; }
 void board_panel_push(const uint16_t *fb) { (void)fb; hb_pushes++; }
 void board_brightness(int p) { hb_brightness = p; }
 bool board_touch(double *x, double *y) { (void)x; (void)y; return false; }

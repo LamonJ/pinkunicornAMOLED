@@ -64,6 +64,13 @@ typedef struct {
     /* Displayed age the last time a birthday tune was considered.
      * -1 until the first tick, so a boot does not play one. */
     int     birthday_age;
+
+    /* Finger-down tracking for the mute hold. hold_fired stays set until
+     * the finger lifts, so the release is not also a tap. */
+    bool    hold_down;
+    bool    hold_fired;
+    int64_t hold_at;
+    double  hold_x, hold_y;
 } app_t;
 
 void app_init(app_t *a, int64_t now_ms);
@@ -81,6 +88,11 @@ void app_frame(app_t *a, double t, int64_t now_ms);
 
 /* Input. Coordinates are world units (0..63). */
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy);
+
+/* Call every frame with the finger state. A still hold of APP_HOLD_MS
+ * toggles the speaker and returns true on that frame only. */
+#define APP_HOLD_MS 800
+bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y);
 void app_button(app_t *a, int64_t now_ms, int which);   /* 0 top, 1 bottom */
 void app_picked_up(app_t *a, int64_t now_ms);
 

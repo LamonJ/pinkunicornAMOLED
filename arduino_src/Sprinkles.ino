@@ -202,6 +202,7 @@ void setup()
 
     int64_t now = board_now_ms();
     load_state(now);
+    board_audio_enable(app.pet.sound);
     last_frame = last_tick = last_save = now;
 
     if (!woke) {
@@ -385,7 +386,15 @@ after_input:;
     bool down = board_touch(&tx, &ty);
     if (down) { last_x = tx; last_y = ty; }
     if (down && !touch_was_down) { down_x = tx; down_y = ty; down_at = now; }
-    if (!down && touch_was_down &&
+    if (down && app_hold(&app, now, 1, tx, ty)) {
+        Serial.println(app.pet.sound ? "[mute] sound on" : "[mute] sound off");
+        save_state();
+        last_save = now;
+    }
+    /* A hold that muted must not also count as a tap when the finger lifts. */
+    bool held = app.hold_fired;
+    if (!down) app_hold(&app, now, 0, 0, 0);
+    if (!down && touch_was_down && !held &&
         now - down_at < 400 &&
         fabs(last_x - down_x) < 5 && fabs(last_y - down_y) < 5) {
         Serial.printf("[tap] raw %d,%d -> world %.1f,%.1f\n",
