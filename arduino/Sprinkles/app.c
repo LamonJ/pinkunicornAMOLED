@@ -38,6 +38,7 @@ static const spr_note_t SND_DANCE[]    = { {800,130},{1000,130},{1250,150},{1500
 static const spr_note_t SND_POOP[]     = { {520,170},{380,230} };
 static const spr_note_t SND_READY[]    = { {900,140},{1200,140},{1500,160},{1900,260} };
 static const spr_note_t SND_LOW[]      = { {600,200},{440,260} };
+static const spr_note_t SND_DIE[]      = { {420,240},{280,280},{160,360} };
 /* Acknowledges the press itself, since the action it triggers is a second
  * behind. Without this the button feels dead for that whole second. */
 static const spr_note_t SND_PRESS[]    = { {1300,90},{1000,120} };
@@ -126,8 +127,8 @@ bool app_busy(const app_t *a)
  * using it or dismissing it. Her tricks stand down while it is open. */
 bool app_menu_visible(const app_t *a)
 {
-    if (a->pet.stage == ST_EGG || a->pet.asleep || a->evo_on ||
-        a->screen_off || a->dev_menu)
+    if (a->pet.stage == ST_EGG || a->pet.stage == ST_DEAD || a->pet.asleep ||
+        a->evo_on || a->screen_off || a->dev_menu)
         return false;
     return a->menu;
 }
@@ -136,12 +137,13 @@ static bool can_roll(const app_t *a)
 {
     return !a->pet.asleep && !a->evo_on && !a->roll_on && !a->peek_on && !a->menu
         && a->pet.hunger >= PET_FED_ENOUGH && a->pet.energy >= 3 && a->pet.mess == 0
-        && a->pet.stage != ST_EGG;
+        && a->pet.stage != ST_EGG && a->pet.stage != ST_DEAD;
 }
 static bool can_peek(const app_t *a)
 {
     return !a->pet.asleep && !a->evo_on && !a->roll_on && !a->peek_on && !a->menu
-        && a->pet.happy >= 3 && a->pet.energy >= 2 && a->pet.stage != ST_EGG;
+        && a->pet.happy >= 3 && a->pet.energy >= 2
+        && a->pet.stage != ST_EGG && a->pet.stage != ST_DEAD;
 }
 
 static void wake_screen(app_t *a, int64_t now_ms)
@@ -183,11 +185,25 @@ void app_tick(app_t *a, int64_t now_ms)
 
     pet_tick(&a->pet, now_ms, r_mess);
 
-    if (a->pet.mess > mess_was) PLAY(SND_POOP);
-    if (!ready_was && pet_pending_grow(&a->pet, now_ms) != ST_COUNT)
-        PLAY(SND_READY);                     /* she has started shimmering */
-    if (!low_was && (a->pet.hunger <= 1 || a->pet.happy <= 1))
-        PLAY(SND_LOW);                       /* a meter just got worrying */
+    if (was != ST_DEAD && a->pet.stage == ST_DEAD) {
+        a->menu = false;
+        a->roll_on = false;
+        a->peek_on = false;
+        a->evo_on = false;
+        a->evo_queued = false;
+        a->anim = AN_NONE;
+        a->act_pending = 0;
+        a->pressed = 0;
+        PLAY(SND_DIE);
+    }
+
+    if (a->pet.stage != ST_DEAD) {
+        if (a->pet.mess > mess_was) PLAY(SND_POOP);
+        if (!ready_was && pet_pending_grow(&a->pet, now_ms) != ST_COUNT)
+            PLAY(SND_READY);                 /* she has started shimmering */
+        if (!low_was && (a->pet.hunger <= 1 || a->pet.happy <= 1))
+            PLAY(SND_LOW);                   /* a meter just got worrying */
+    }
     a->last_pet_tick_ms = now_ms;
 
     if (was == ST_EGG && a->pet.stage != ST_EGG) {
@@ -204,7 +220,7 @@ void app_tick(app_t *a, int64_t now_ms)
         now_ms - a->idle_last_ms > (int64_t)timeout * 1000)
         a->screen_off = true;
 
-    if (a->screen_off) return;
+    if (a->screen_off || a->pet.stage == ST_DEAD) return;
 
     double t = (double)now_ms;
 
@@ -306,6 +322,13 @@ void app_frame(app_t *a, double t, int64_t now_ms)
 
     gfx_clear(nap ? C_VOID_OFF : C_VOID);
 
+    if (a->pet.stage == ST_DEAD) {
+        gfx_dim = 1.0;
+        spr_dead(t);
+        gfx_dim = 1.0;
+        return;
+    }
+
     if (a->pet.stage == ST_EGG) {
         double p = pet_age_minutes(&a->pet, now_ms) / PET_STAGE_AT[ST_BLOB];
         if (p > 1) p = 1;
@@ -401,7 +424,20 @@ static void do_feed(app_t *a, int64_t now_ms)
 {
     feed_result_t r = pet_feed(&a->pet, now_ms);
     switch (r) {
-    case FEED_REFUSED_FULL: PLAY(SND_REFUSE); break;
+    case FEED_OVERFULL:
+        /* She ate it. A full cake bar costs a heart, and the last one
+         * ends her — the dead picture replaces the bite. */
+        if (a->pet.stage == ST_DEAD) {
+            a->anim = AN_NONE;
+            a->menu = false;
+            a->roll_on = false;
+            a->peek_on = false;
+            PLAY(SND_DIE);
+        } else {
+            play(a, AN_EAT);
+            PLAY(SND_LOW);
+        }
+        break;
     case FEED_TRANSFORM:
         /* Eat first. Cutting straight to the light show meant a child pressed
          * "feed" and never saw her eat - it read as the wrong button. */
@@ -460,6 +496,14 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
     a->idle_last_ms = now_ms;
     if (now_ms - a->woke_at_ms < 400) return;      /* that tap was the wake-up */
     if (app_busy(a)) return;
+
+    if (a->pet.stage == ST_DEAD) {
+        if (wx >= HATCH_X0 && wx <= HATCH_X1 && wy >= HATCH_Y0 && wy <= HATCH_Y1) {
+            app_init(a, now_ms);
+            PLAY(SND_STAGE);
+        }
+        return;
+    }
 
     if (a->pet.stage == ST_EGG) { egg_tap(a, now_ms); return; }
 
@@ -532,6 +576,9 @@ void app_button(app_t *a, int64_t now_ms, int which)
      * the toy is reachable yet, so a press that did nothing would just teach
      * a child that the buttons are decoration. */
     if (a->pet.stage == ST_EGG) { egg_tap(a, now_ms); return; }
+
+    /* Dead: the only restart is the on-screen hatch button. */
+    if (a->pet.stage == ST_DEAD) return;
 
     /* Either button wakes her from a nap — a child mashing both should get
      * the obvious result. */

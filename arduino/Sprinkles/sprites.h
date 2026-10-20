@@ -68,6 +68,8 @@ void spr_egg(double progress, double t, int nudged);
 void spr_hud(const pet_t *p, int energy_only, double t);
 /* Age under her paws. value is 0..100, drawn with no unit. */
 void spr_age(int value);
+/* Lying still, X eyes, a slow sparkle, and the new-egg button. */
+void spr_dead(double t);
 void spr_mess(const pet_t *p);
 void spr_cupcake(double x, double y, int bites);
 void spr_broom(double x, double y);
@@ -106,6 +108,13 @@ int    spr_perk_wig(double anim_t);
 #define BTN_CLEAN_X 49
 #define BTN_Y       35
 #define BTN_HIT_R   14
+
+/* Hatch button on the dead scene. Two short lines: the round glass
+ * clips a single "HATCH A NEW EGG" along the bottom edge. */
+#define HATCH_X0 12
+#define HATCH_X1 52
+#define HATCH_Y0 42
+#define HATCH_Y1 58
 
 #ifdef __cplusplus
 }

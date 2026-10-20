@@ -4,7 +4,8 @@
  * and it tells you what she is. Everything here is unit-testable on a PC.
  *
  * Two rules that must survive refactoring:
- *   1. She never dies. Every need bottoms out at 0 and recovers.
+ *   1. Hunger and energy bottom out at 0 and can recover. Happiness can
+ *      reach 0 too, and at 0 she dies.
  *   2. She never advances a growth stage on her own. Age only makes her
  *      eligible; feeding is what transforms her, so a child sees it happen.
  */
@@ -18,7 +19,7 @@
 extern "C" {
 #endif
 
-typedef enum { ST_EGG = 0, ST_BLOB, ST_KITTEN, ST_UNICORN, ST_ROYAL, ST_COUNT } stage_t;
+typedef enum { ST_EGG = 0, ST_BLOB, ST_KITTEN, ST_UNICORN, ST_ROYAL, ST_DEAD, ST_COUNT } stage_t;
 
 typedef enum {
     MOOD_OK = 0, MOOD_HAPPY, MOOD_SAD, MOOD_SLEEP, MOOD_EAT
@@ -165,7 +166,7 @@ double  pet_stage_remaining(const pet_t *p, int64_t now_ms);
 /* Actions. Return value says whether anything happened, so the caller knows
  * which sound and animation to play. */
 typedef enum {
-    FEED_REFUSED_FULL,   /* already full and not eligible: short low beep */
+    FEED_OVERFULL,   /* cake already full: she eats it and loses a heart */
     FEED_PLAIN,          /* ate it, wasn't hungry: no hearts              */
     FEED_HUNGRY,         /* ate it and needed it: hearts + long chime     */
     FEED_TRANSFORM       /* eligible: run the transformation              */

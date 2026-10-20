@@ -4,7 +4,7 @@
 const double PET_STAGE_AT[ST_COUNT] = {
     0.0,        /* egg     */
     0.75,       /* blob    — the egg hatches after 45 s */
-    480.0, 1800.0, 4320.0     /* unused: see PET_STAGE_DWELL */
+    480.0, 1800.0, 4320.0, 0.0
 };
 
 /* Time she must spend in each stage before the next unlocks. */
@@ -13,10 +13,11 @@ const double PET_STAGE_DWELL[ST_COUNT] = {
     480.0,      /* blob    — 8 h  before kitten     */
     1320.0,     /* kitten  — 22 h before unicorn    */
     2520.0,     /* unicorn — 42 h before royal      */
-    0.0         /* royal   — fully grown            */
+    0.0,        /* royal   — fully grown            */
+    0.0         /* dead    — stays until a new egg  */
 };
 const char *PET_STAGE_NAME[ST_COUNT] = {
-    "EGG", "LITTLE BLOB", "KITTEN", "UNICORN", "ROYAL UNICAT"
+    "EGG", "LITTLE BLOB", "KITTEN", "UNICORN", "ROYAL UNICAT", "DEAD"
 };
 
 static const int MESS_ZONES[PET_MESS_MAX] = { 13, 51 };
@@ -86,6 +87,16 @@ static void regen(int *pip, double *frac, double dt, double per)
     while (*frac >= per) { *frac -= per; if (*pip < 4) (*pip)++; }
 }
 
+/* Happiness at 0 is the end. Meters freeze; only a new egg starts again. */
+static void pet_die(pet_t *p)
+{
+    p->stage = ST_DEAD;
+    p->happy = 0;
+    p->napping = false;
+    p->asleep = false;
+    p->mess = 0;
+}
+
 stage_t pet_pending_grow(const pet_t *p, int64_t now_ms)
 {
     if (p->stage == ST_EGG || p->stage >= ST_ROYAL) return ST_COUNT;
@@ -142,6 +153,7 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
     double dt = (double)(now_ms - p->last_tick_ms) / 60000.0 * p->speed;
     p->last_tick_ms = now_ms;
     if (dt <= 0) return;
+    if (p->stage == ST_DEAD) return;
 
     /* The egg is the only stage that advances on its own. */
     if (p->stage == ST_EGG) {
@@ -195,11 +207,18 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
         double step = (left > slice) ? slice : left;
         needs_step(p, step);
         left -= step;
+        /* Stop on the minute she dies, so a long absence matches
+         * ticking once a minute: later time does not keep draining her. */
+        if (p->happy <= 0) break;
     }
 
-    /* Mess, never while asleep. Evaluated once per call: the caller supplies
-     * randomness so tests stay deterministic. */
-    if (!p->asleep && p->mess < PET_MESS_MAX &&
+    /* A heart at 0 is death, whether it fell from neglect or from
+     * one cake too many. */
+    if (p->happy <= 0) pet_die(p);
+
+    /* Mess, never while asleep or dead. Evaluated once per call: the caller
+     * supplies randomness so tests stay deterministic. */
+    if (p->stage != ST_DEAD && !p->asleep && p->mess < PET_MESS_MAX &&
         rand01 < dt / PET_MESS_MIN[p->mess]) {
         p->mess_x[p->mess] = MESS_ZONES[p->mess % PET_MESS_MAX];
         p->mess++;
@@ -208,10 +227,24 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
 
 feed_result_t pet_feed(pet_t *p, int64_t now_ms)
 {
-    stage_t grow = pet_pending_grow(p, now_ms);
-    bool hungry = p->hunger < 4;
+    stage_t grow;
+    bool hungry;
 
-    if (!hungry && grow == ST_COUNT) return FEED_REFUSED_FULL;
+    if (p->stage == ST_DEAD || p->stage == ST_EGG) return FEED_OVERFULL;
+
+    grow = pet_pending_grow(p, now_ms);
+    hungry = p->hunger < 4;
+
+    /* No cutoff. A cake on top of a full bar costs a heart instead of
+     * filling anything. The last heart kills her. Growing still wins:
+     * that feeding is the one that changes her shape. */
+    if (!hungry && grow == ST_COUNT) {
+        if (p->happy > 0) p->happy--;
+        p->frac_happy = 0;
+        p->frac_regen_happy = 0;
+        if (p->happy <= 0) pet_die(p);
+        return FEED_OVERFULL;
+    }
 
     if (p->hunger < 4) p->hunger++;
     /* Restart the drain timer, or leftover credit could take the new pip
@@ -231,6 +264,7 @@ void pet_finish_transform(pet_t *p, int64_t now_ms)
 
 bool pet_clean(pet_t *p)
 {
+    if (p->stage == ST_DEAD) return false;
     if (p->mess == 0) return false;
     p->mess = 0;
     return true;
@@ -241,6 +275,7 @@ bool pet_clean(pet_t *p)
  * reward. */
 bool pet_cuddle(pet_t *p, int64_t now_ms)
 {
+    if (p->stage == ST_DEAD) return false;
     if (now_ms < p->cuddle_next_heart_ms) return false;
     if (p->happy >= 4) return false;
     p->cuddle_next_heart_ms = now_ms + PET_CUDDLE_CD_MS;
@@ -250,6 +285,7 @@ bool pet_cuddle(pet_t *p, int64_t now_ms)
 
 void pet_set_nap(pet_t *p, bool nap, int64_t now_ms)
 {
+    if (p->stage == ST_DEAD) return;
     p->napping = nap;
     if (nap) {
         p->asleep = true;

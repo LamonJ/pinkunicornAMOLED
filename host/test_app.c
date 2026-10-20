@@ -335,10 +335,63 @@ static void test_age_is_drawn(void)
     CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "500 min shows age 25");
 }
 
+/* Full bars still take a cake. Each one costs a heart. The fourth kills,
+ * and the hatch button is the only way back to an egg. */
+static void test_overfeed_and_hatch(void)
+{
+    boot(ST_ROYAL);
+    A.pet.hunger = 4;
+    A.pet.happy = 4;
+
+    for (int i = 0; i < 3; i++) {
+        app_touch(&A, hb_now, 20, 10);
+        frames(1100);
+        CHECK(A.pet.stage == ST_ROYAL, "alive after extra cake %d", i + 1);
+        CHECK(A.pet.hunger == 4, "cake stays full");
+        CHECK(A.pet.happy == 3 - i, "heart now %d, got %d", 3 - i, A.pet.happy);
+        CHECK(A.anim == AN_EAT && !A.anim_love, "she eats it, no hearts");
+    }
+    app_touch(&A, hb_now, 20, 10);
+    frames(1100);
+    CHECK(A.pet.stage == ST_DEAD, "the last heart kills her");
+    CHECK(A.pet.happy == 0, "hearts are gone");
+    CHECK(A.anim != AN_EAT, "the dead picture replaces the bite");
+
+    app_frame(&A, 0, hb_now);
+    int dark = 0, coat = 0;
+    for (int y = HATCH_Y0; y <= HATCH_Y1; y++) {
+        for (int x = HATCH_X0; x <= HATCH_X1; x++) {
+            rgb_t c = gfx_fb[y * GFX_W + x];
+            if (c == C_DARK) dark++;
+            if (c == C_COAT) coat++;
+        }
+    }
+    CHECK(dark > 30, "HATCH NEW EGG is drawn, got %d dark px", dark);
+    CHECK(coat > 40, "the button is filled, got %d coat px", coat);
+    CHECK(gfx_dim == 1.0, "dead frame restores brightness");
+
+    unsigned long sum0 = 0, sum1 = 0;
+    app_frame(&A, 0, hb_now);
+    for (int i = 0; i < 40 * GFX_W; i++) sum0 += gfx_fb[i];
+    app_frame(&A, 900, hb_now);
+    for (int i = 0; i < 40 * GFX_W; i++) sum1 += gfx_fb[i];
+    CHECK(sum0 != sum1, "the dead scene moves");
+
+    app_touch(&A, hb_now, 10, 10);
+    CHECK(A.pet.stage == ST_DEAD, "a miss does nothing");
+    app_button(&A, hb_now, 1);
+    CHECK(A.pet.stage == ST_DEAD && !A.pet.napping, "a side button does not nap her");
+    app_touch(&A, hb_now, 32, 50);
+    CHECK(A.pet.stage == ST_EGG, "Hatch a New Egg starts over");
+    CHECK(A.pet.hunger == 4 && A.pet.happy == 4 && A.pet.energy == 4,
+          "the egg's meters are full");
+}
+
 static void test_frame_all_states(void)
 {
     struct { const char *name; stage_t st; int nap, menu, roll, peek, evo; } cases[] = {
         { "egg",     ST_EGG,     0,0,0,0,0 },
+        { "dead",    ST_DEAD,    0,0,0,0,0 },
         { "blob",    ST_BLOB,    0,0,0,0,0 },
         { "kitten",  ST_KITTEN,  0,0,0,0,0 },
         { "unicorn", ST_UNICORN, 0,0,0,0,0 },
@@ -385,6 +438,7 @@ int main(void)
         { "egg can be tapped out",        test_egg_tap },
         { "every state composes clean",   test_frame_all_states },
         { "age is drawn",                 test_age_is_drawn },
+        { "overfeed and hatch",           test_overfeed_and_hatch },
     };
     for (unsigned i = 0; i < sizeof tests / sizeof *tests; i++) {
         int before = fails;

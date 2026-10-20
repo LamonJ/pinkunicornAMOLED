@@ -10,6 +10,7 @@ const feat_t FEAT[ST_COUNT] = {
     /* kitten  */ {   12, 10,  4,  4,   3,   0,   0,    1,    0,   3 },
     /* unicorn */ {   16, 13,  5,  6,   5,   5,   4,    1,    0,   4 },
     /* royal   */ {   19, 15,  6,  8,   6,   5,   6,    1,    0,   5 },
+    /* dead    */ {    0,  0,  0,  0,   0,   0,   0,    0,    0,   0 },
 };
 
 /* ---- string sprites --------------------------------------------------- */
@@ -281,6 +282,82 @@ void spr_hud(const pet_t *p, int energy_only, double t)
     map1(21, 2, ICON_HEART, 4, C_R1);  pips(27, 2,  p->happy,  C_R1, 0, t);
     map1(10, 9, ICON_CAKE,  5, C_R4);  pips(16, 10, p->hunger, C_R4, 0, t);
     map1(33, 9, ICON_MOON,  5, C_R5);  pips(39, 10, p->energy, C_R5, 0, t);
+}
+
+/* ---- death ------------------------------------------------------------ */
+static const char *GLY_H[] = { "#.#", "#.#", "###", "#.#", "#.#" };
+static const char *GLY_A[] = { ".#.", "#.#", "###", "#.#", "#.#" };
+static const char *GLY_T[] = { "###", ".#.", ".#.", ".#.", ".#." };
+static const char *GLY_C[] = { "###", "#..", "#..", "#..", "###" };
+static const char *GLY_N[] = { "#.#", "##.", "#.#", "#.#", "#.#" };
+static const char *GLY_E[] = { "###", "#..", "##.", "#..", "###" };
+static const char *GLY_W[] = { "#.#", "#.#", "###", "#.#", "#.#" };
+static const char *GLY_G[] = { "###", "#..", "##.", "#.#", "###" };
+static const char *XEYE[]  = { "#.#", ".#.", "#.#" };
+
+static void word(int x, int y, const char **const *glyphs, int n, rgb_t c)
+{
+    for (int i = 0; i < n; i++) {
+        map1(x, y, glyphs[i], 5, c);
+        x += 4;
+    }
+}
+
+void spr_dead(double t)
+{
+    double saved = gfx_dim;
+    int bob = gfx_round(sin(t / 1100.0));
+    double hy = 24 + bob;
+    double by = 28 + bob;
+
+    /* Faded, so the hatch button is the bright thing on the glass. */
+    gfx_dim = 0.62;
+    gfx_ellipse(34, 36, 11, 2, C_DIM);                  /* ground shadow */
+    gfx_rect(48, by + 2, 3, 2, C_COATSH);               /* limp tail */
+    gfx_rect(51, by + 4, 2, 2, C_COATSH);
+    gfx_px(53, (int)by + 5, C_R6);
+    gfx_ellipse(34, by,     14, 8, C_COATSH);
+    gfx_ellipse(34, by - 1, 13, 7, C_COAT);
+    gfx_ellipse(17, hy,     8, 7, C_COATSH);
+    gfx_ellipse(17, hy - 1, 7, 6, C_COAT);
+    gfx_ear(13, hy - 4, 5, 4, -1, C_COATSH);
+    gfx_ear(21, hy - 4, 4, 3,  1, C_COATSH);
+    gfx_ear(13, hy - 5, 3, 2, -1, C_BLUSH);
+    gfx_rect(16, hy - 12, 2, 4, C_HORNSH);
+    gfx_rect(16, hy - 13, 1, 2, C_HORN);
+    gfx_ellipse(26, by + 6, 3, 2, C_COATSH);            /* tucked paws */
+    gfx_ellipse(38, by + 6, 3, 2, C_COATSH);
+
+    gfx_dim = 1.0;
+    map1(13, hy - 2, XEYE, 3, C_DARK);
+    map1(18, hy - 2, XEYE, 3, C_DARK);
+    gfx_px(17, (int)hy + 2, C_CHERRY);
+
+    /* A slow drift, so the picture is an animation and not a still. */
+    {
+        const rgb_t cols[3] = { C_R3, C_R5, C_R6 };
+        for (int i = 0; i < 3; i++) {
+            double ph = fmod(t / 1600.0 + i * 0.33, 1.0);
+            if (ph < 0) ph += 1.0;
+            double sx = 12 + ph * 36;
+            double sy = 8 + sin(ph * 6.2832 + i) * 2;
+            if (ph < 0.72) map1(sx, sy, SPARK, 3, cols[i]);
+            else gfx_px((int)sx + 1, (int)sy + 1, cols[i]);
+        }
+    }
+
+    gfx_ellipse(32, 50, 20, 8, C_DARK);
+    gfx_ellipse(32, 50, 19, 7, C_COAT);
+    gfx_ellipse(22, 46, 4, 2, C_COATHI);
+    {
+        const char **hatch[5] = { GLY_H, GLY_A, GLY_T, GLY_C, GLY_H };
+        const char **neu[3]   = { GLY_N, GLY_E, GLY_W };
+        const char **egg[3]   = { GLY_E, GLY_G, GLY_G };
+        word(22, 45, hatch, 5, C_DARK);   /* HATCH, width 19, centred */
+        word(19, 51, neu,   3, C_DARK);   /* NEW */
+        word(33, 51, egg,   3, C_DARK);   /* EGG, one gap after NEW */
+    }
+    gfx_dim = saved;
 }
 
 /* ---- props ------------------------------------------------------------ */

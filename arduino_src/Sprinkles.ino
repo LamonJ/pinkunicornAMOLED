@@ -122,7 +122,9 @@ static void draw_dev_screen(int64_t now)
     snprintf(l[n++], 40, "Mess %d  %s", app.pet.mess,
              app.pet.asleep ? "asleep" : "awake");
     stage_t nx = pet_pending_grow(&app.pet, now);
-    if (nx != ST_COUNT)
+    if (app.pet.stage == ST_DEAD)
+        snprintf(l[n++], 40, "Next   hatch an egg");
+    else if (nx != ST_COUNT)
         snprintf(l[n++], 40, "Next   FEED HER NOW");
     else {
         double left = pet_stage_remaining(&app.pet, now);
@@ -412,6 +414,16 @@ after_input:;
         if (pct != want_pct) { board_brightness(pct); want_pct = pct; }
     }
     app_advance(&app, dt, now);
+
+    /* Death and a new egg happen off the tap that queued them. Write the
+     * stage as soon as it changes so a power cut does not undo it. */
+    {
+        static int persisted_stage = -1;
+        if ((int)app.pet.stage != persisted_stage) {
+            if (persisted_stage >= 0) { save_state(); last_save = now; }
+            persisted_stage = (int)app.pet.stage;
+        }
+    }
 
     /* Flash has limited write cycles, and a pet that loses thirty seconds of
      * ageing loses nothing anyone can perceive. */

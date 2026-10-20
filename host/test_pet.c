@@ -1,6 +1,7 @@
 /* test_pet.c — the state machine, on a PC, with no hardware in sight.
- * Covers the invariants that matter: she never dies, she never grows on her
- * own, and the cuddle cooldown gates the heart and not the reaction. */
+ * Covers the invariants that matter: hunger and energy bottom at 0, a heart
+ * at 0 kills her, she never grows on her own, and the cuddle cooldown gates
+ * the heart and not the reaction. */
 #include "../sprinkles/pet.h"
 #include <stdio.h>
 #include <string.h>
@@ -19,6 +20,24 @@ static void advance(pet_t *p, double minutes, int64_t *now)
     for (int i = 0; i < (int)minutes; i++) {
         *now += MIN(1);
         pet_tick(p, *now, 1.0);   /* rand01=1.0 -> never messes */
+    }
+}
+
+/* A long wait that is about the growth clock, not about starving.
+ * Top her up often enough that the heart bar cannot reach 0. */
+static void age_cared_for(pet_t *p, double minutes, int64_t *now)
+{
+    while (minutes > 0) {
+        double step = minutes > 30 ? 30 : minutes;
+        p->hunger = 4;
+        p->happy = 4;
+        p->energy = 4;
+        p->mess = 0;
+        p->asleep = false;
+        p->napping = false;
+        p->frac_hunger = p->frac_happy = p->frac_regen_happy = 0;
+        advance(p, step, now);
+        minutes -= step;
     }
 }
 
@@ -85,10 +104,11 @@ static void test_never_grows_alone(void)
      * and burn through them on four cupcakes. */
     CHECK(pet_pending_grow(&p, now) == ST_COUNT,
           "not eligible for unicorn the moment she becomes a kitten");
-    advance(&p, 600, &now);
+    age_cared_for(&p, 600, &now);
+    CHECK(p.stage == ST_KITTEN, "care keeps her alive, got %s", PET_STAGE_NAME[p.stage]);
     CHECK(pet_pending_grow(&p, now) == ST_COUNT,
           "still not eligible after 10 h as a kitten (needs 22)");
-    advance(&p, 800, &now);
+    age_cared_for(&p, 800, &now);
     CHECK(pet_pending_grow(&p, now) == ST_UNICORN,
           "eligible after 23 h as a kitten");
 }
@@ -98,7 +118,7 @@ static void test_old_pet_does_not_rocket_through_stages(void)
 {
     pet_t p; int64_t now = 0; pet_init(&p, now);
     advance(&p, 2, &now);
-    advance(&p, 60 * 200, &now);            /* 200 h old, thoroughly ancient */
+    age_cared_for(&p, 60 * 200, &now);      /* 200 h old, looked after, ancient */
 
     CHECK(pet_feed(&p, now) == FEED_TRANSFORM, "first feed transforms");
     pet_finish_transform(&p, now);
@@ -111,16 +131,76 @@ static void test_old_pet_does_not_rocket_through_stages(void)
     CHECK(p.stage == ST_KITTEN, "still a kitten");
 }
 
-static void test_never_dies(void)
+static void test_hunger_bottoms(void)
+{
+    pet_t p; int64_t now = 0; pet_init(&p, now);
+    advance(&p, 2, &now);
+    advance(&p, 7 * 60, &now);
+    CHECK(p.hunger == 0, "hunger bottoms out at 0, got %d", p.hunger);
+    CHECK(p.hunger >= 0 && p.happy >= 0 && p.energy >= 0, "nothing goes negative");
+    CHECK(p.stage != ST_DEAD, "empty cake alone does not kill her");
+    for (int i = 0; i < 4; i++) pet_feed(&p, now);
+    CHECK(p.hunger == 4, "four cupcakes refill her, got %d", p.hunger);
+    CHECK(p.stage != ST_DEAD, "feeding an empty bar does not cost a heart");
+}
+
+static void test_overfeed_costs_a_heart(void)
+{
+    pet_t p; int64_t now = 0; pet_init(&p, now);
+    advance(&p, 2, &now);
+    p.stage = ST_ROYAL;                      /* fully grown, so food cannot transform */
+    p.hunger = 4;
+    p.happy = 4;
+    CHECK(pet_feed(&p, now) == FEED_OVERFULL, "a full bar still accepts the cake");
+    CHECK(p.hunger == 4, "cake stays full, got %d", p.hunger);
+    CHECK(p.happy == 3, "and a heart comes off, got %d", p.happy);
+    CHECK(p.stage == ST_ROYAL, "one extra cake does not kill her");
+    pet_feed(&p, now);
+    pet_feed(&p, now);
+    CHECK(p.happy == 1, "three extra cakes leave one heart, got %d", p.happy);
+    CHECK(pet_feed(&p, now) == FEED_OVERFULL, "the last cake is still eaten");
+    CHECK(p.stage == ST_DEAD, "the last heart kills her, got %s", PET_STAGE_NAME[p.stage]);
+    CHECK(p.happy == 0, "hearts are gone");
+    CHECK(pet_feed(&p, now) == FEED_OVERFULL, "feeding a corpse reports the same");
+    CHECK(p.stage == ST_DEAD && p.happy == 0, "and does not bring her back");
+}
+
+static void test_grow_feed_is_not_overfeed(void)
+{
+    pet_t p; int64_t now = 0; pet_init(&p, now);
+    advance(&p, 2, &now);
+    p.hunger = 4;
+    p.happy = 4;
+    p.stage_since_ms = now - MIN(500);       /* blob dwell is 8 h */
+    CHECK(pet_feed(&p, now) == FEED_TRANSFORM, "a full bar still grows her");
+    CHECK(p.happy == 4, "growing does not cost a heart, got %d", p.happy);
+    CHECK(p.stage == ST_BLOB, "the shape waits for the animation");
+}
+
+static void test_neglect_kills(void)
 {
     pet_t p; int64_t now = 0; pet_init(&p, now);
     advance(&p, 2, &now);
     for (int d = 0; d < 30; d++) advance(&p, 1440, &now);   /* a month, ignored */
-    CHECK(p.hunger >= 0 && p.happy >= 0 && p.energy >= 0, "nothing goes negative");
-    CHECK(p.hunger == 0, "hunger bottoms out at 0, got %d", p.hunger);
-    /* and she comes back */
-    for (int i = 0; i < 4; i++) pet_feed(&p, now);
-    CHECK(p.hunger == 4, "four cupcakes refill her, got %d", p.hunger);
+    CHECK(p.stage == ST_DEAD, "a month alone ends it, got %s", PET_STAGE_NAME[p.stage]);
+    CHECK(p.happy == 0, "hearts are gone");
+    CHECK(p.hunger >= 0 && p.energy >= 0, "other meters stay in range");
+    CHECK(!p.asleep && !p.napping, "death is not sleep");
+
+    /* One long catch-up must land on the same death as minute steps. */
+    pet_t a, b; int64_t t0 = 0;
+    pet_init(&a, t0); pet_init(&b, t0);
+    a.stage = b.stage = ST_ROYAL;
+    a.hunger = b.hunger = 0;
+    a.happy = b.happy = 2;
+    a.frac_happy = b.frac_happy = 0;
+    int64_t t = t0;
+    for (int i = 0; i < 400; i++) { t += MIN(1); pet_tick(&a, t, 1.0); }
+    pet_tick(&b, t0 + MIN(400), 1.0);
+    CHECK(a.stage == ST_DEAD && b.stage == ST_DEAD, "both paths die");
+    CHECK(a.happy == b.happy && a.energy == b.energy && a.hunger == b.hunger,
+          "stepwise %d/%d/%d vs catch-up %d/%d/%d",
+          a.hunger, a.happy, a.energy, b.hunger, b.happy, b.energy);
 }
 
 static void test_feed_results(void)
@@ -128,11 +208,15 @@ static void test_feed_results(void)
     pet_t p; int64_t now = 0; pet_init(&p, now);
     advance(&p, 2, &now);
     p.hunger = 4;                            /* she hatches at 2 now */
-    CHECK(pet_feed(&p, now) == FEED_REFUSED_FULL, "full pet refuses");
+    p.happy = 4;
+    CHECK(pet_feed(&p, now) == FEED_OVERFULL, "full pet still eats");
+    CHECK(p.happy == 3, "and loses a heart, got %d", p.happy);
     p.hunger = 2;
     CHECK(pet_feed(&p, now) == FEED_HUNGRY, "hungry pet swoons");
+    CHECK(p.happy == 3, "a needed cake does not cost a heart");
     p.hunger = 4;
-    CHECK(pet_feed(&p, now) == FEED_REFUSED_FULL, "still full");
+    CHECK(pet_feed(&p, now) == FEED_OVERFULL, "still no cutoff");
+    CHECK(p.happy == 2, "another heart, got %d", p.happy);
 }
 
 static void test_happy_follows_care(void)
@@ -430,7 +514,10 @@ int main(void)
         { "egg can be tapped out",     test_egg_nudge },
         { "never grows unwatched",     test_never_grows_alone },
         { "no stage stacking",         test_old_pet_does_not_rocket_through_stages },
-        { "never dies",                test_never_dies },
+        { "hunger bottoms and refills", test_hunger_bottoms },
+        { "overfeed costs a heart",    test_overfeed_costs_a_heart },
+        { "grow feed is not overfeed", test_grow_feed_is_not_overfeed },
+        { "neglect kills",             test_neglect_kills },
         { "feed results",              test_feed_results },
         { "happy follows care",        test_happy_follows_care },
         { "nap restores energy fast",  test_sleep_restores_energy_fast },

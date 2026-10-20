@@ -54,13 +54,15 @@ Happiness.
 
 It falls when the cake bar is under 2, when there is poop on the floor, or while she is asleep. Sleep slows that drop. While she is awake, the cake bar is at 2 or more, and the floor is clean, a pip comes back about every 15 minutes. Petting her can add one, at most once every 10 seconds, until the bar is full. Left in a bad state, one pip takes about 3 hours 10 minutes to fall off.
 
+Feeding her when the cake bar is already full still works, and that cake costs one heart. At 0 she dies.
+
 ### Cake
 
 How full she is.
 
 ![Cake meter](docs/meters/cake.png)
 
-It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake meter to feed her.
+It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake meter to feed her. The bar does not have to have room. A cake on a full bar costs a heart.
 
 ### Moon
 
@@ -69,6 +71,12 @@ Energy.
 ![Moon meter](docs/meters/moon.png)
 
 It falls while she is awake, about one pip every 3 hours 50 minutes. A nap fills it, about one pip every 3 minutes. At empty she falls asleep.
+
+## When she dies
+
+The heart bar at 0 is the end, from one cake too many or from being left. She lies still, and a button underneath reads HATCH / NEW EGG. Tap it and she starts over as an egg.
+
+![Dead, with the hatch button](docs/dead.png)
 
 ## What's here
 
