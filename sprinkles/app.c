@@ -34,6 +34,10 @@ static const spr_note_t SND_PEEK[]     = { {1250,120},{950,120},{700,170} };
 static const spr_note_t SND_PEEK_BACK[]= { {820,180} };
 static const spr_note_t SND_PEEK_HOME[]= { {1000,140},{1350,220} };
 static const spr_note_t SND_DANCE[]    = { {800,130},{1000,130},{1250,150},{1500,200} };
+/* A short rising phrase when the number under her paws goes up.
+ * Long enough to hear as a tune, short enough that one birthday
+ * does not freeze the picture. */
+static const spr_note_t SND_BIRTHDAY[] = { {523,150},{659,150},{784,150},{1046,280} };
 /* Things she does on her own that used to happen in silence. */
 static const spr_note_t SND_POOP[]     = { {520,170},{380,230} };
 static const spr_note_t SND_READY[]    = { {900,140},{1200,140},{1500,160},{1900,260} };
@@ -85,6 +89,7 @@ void app_init(app_t *a, int64_t now_ms)
     a->peek_dir = -1;
     a->idle_last_ms = now_ms;
     a->last_pet_tick_ms = now_ms;
+    a->birthday_age = -1;            /* the first tick learns her age quietly */
 }
 
 static void play(app_t *a, anim_kind_t k)
@@ -209,6 +214,21 @@ void app_tick(app_t *a, int64_t now_ms)
     if (was == ST_EGG && a->pet.stage != ST_EGG) {
         PLAY(SND_STAGE);
         a->dance_until = (double)now_ms + 5500;
+    }
+
+    /* One tune per time the displayed age goes up, including a jump of
+     * several years in a single tick. The first sample after boot is
+     * silent, so switching her on does not celebrate the age she already is.
+     * 100 stays, so the tune stops there. */
+    {
+        int age_now = pet_sim_age(&a->pet, now_ms);
+        if (a->birthday_age < 0)
+            a->birthday_age = age_now;
+        else if (age_now > a->birthday_age && a->pet.stage != ST_DEAD) {
+            a->birthday_age = age_now;
+            PLAY(SND_BIRTHDAY);
+        } else if (age_now != a->birthday_age)
+            a->birthday_age = age_now;
     }
 
     /* The menu being open counts as being in use — the screen must not doze

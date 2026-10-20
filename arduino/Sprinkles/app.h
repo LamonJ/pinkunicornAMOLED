@@ -60,6 +60,10 @@ typedef struct {
     bool    dev_menu;            /* grown-up diagnostics, both buttons 5 s  */
 
     int64_t last_pet_tick_ms;
+
+    /* Displayed age the last time a birthday tune was considered.
+     * -1 until the first tick, so a boot does not play one. */
+    int     birthday_age;
 } app_t;
 
 void app_init(app_t *a, int64_t now_ms);

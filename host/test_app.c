@@ -11,6 +11,8 @@ extern double  hb_rand_ring[8];
 extern int     hb_rand_ring_n;
 extern int     hb_rand_i;
 extern int     hb_beeps, hb_slept;
+extern spr_note_t hb_last_beep[8];
+extern int     hb_last_beep_n;
 
 static int fails = 0, checks = 0;
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { \
@@ -335,6 +337,63 @@ static void test_age_is_drawn(void)
     CHECK(gfx_fb[58 * GFX_W + 28] == C_COATHI, "500 min shows age 25");
 }
 
+/* The number going up is a birthday. One tune, not one per skipped year,
+ * and not on the tick that first notices how old she already is. */
+static void test_birthday_tune(void)
+{
+    boot(ST_BLOB);
+    A.pet.born_ms = hb_now;
+    A.pet.stage_since_ms = hb_now;
+    int before = hb_beeps;
+    seconds(1);
+    CHECK(hb_beeps == before, "the first look at her age is silent");
+    CHECK(A.birthday_age == 0, "age 0 is remembered, got %d", A.birthday_age);
+
+    seconds(19 * 60);
+    CHECK(pet_sim_age(&A.pet, hb_now) == 0, "19 min is still 0, got %d",
+          pet_sim_age(&A.pet, hb_now));
+    CHECK(hb_beeps == before, "no tune before the year");
+
+    seconds(60);
+    CHECK(pet_sim_age(&A.pet, hb_now) == 1, "20 min is 1, got %d",
+          pet_sim_age(&A.pet, hb_now));
+    CHECK(hb_beeps == before + 1, "one tune for the birthday, got %d extra",
+          hb_beeps - before);
+    CHECK(hb_last_beep_n == 4 && hb_last_beep[0].hz == 523
+          && hb_last_beep[3].hz == 1046, "it is the rising phrase");
+
+    before = hb_beeps;
+    seconds(20 * 60);
+    CHECK(pet_sim_age(&A.pet, hb_now) == 2, "the next year, got %d",
+          pet_sim_age(&A.pet, hb_now));
+    CHECK(hb_beeps == before + 1, "and another tune");
+
+    /* Several years in one tick is still one tune. */
+    A.pet.born_ms = hb_now - (int64_t)25 * 20 * 60 * 1000;
+    before = hb_beeps;
+    seconds(1);
+    CHECK(pet_sim_age(&A.pet, hb_now) == 25, "jumped to 25, got %d",
+          pet_sim_age(&A.pet, hb_now));
+    CHECK(hb_beeps == before + 1, "one tune for the jump");
+    CHECK(A.birthday_age == 25, "remembered at 25");
+
+    boot(ST_ROYAL);
+    before = hb_beeps;
+    seconds(2);
+    CHECK(hb_beeps == before, "waking up already older does not celebrate");
+
+    boot(ST_BLOB);
+    A.pet.born_ms = hb_now - 19LL * 60 * 1000;
+    A.pet.stage = ST_DEAD;
+    A.pet.happy = 0;
+    seconds(1);
+    before = hb_beeps;
+    seconds(2 * 60);
+    CHECK(pet_sim_age(&A.pet, hb_now) >= 1, "the number still moves, got %d",
+          pet_sim_age(&A.pet, hb_now));
+    CHECK(hb_beeps == before, "a dead pet does not get a birthday tune");
+}
+
 /* Full bars still take a cake. Each one costs a heart. The fourth kills,
  * and the hatch button is the only way back to an egg. */
 static void test_overfeed_and_hatch(void)
@@ -438,6 +497,7 @@ int main(void)
         { "egg can be tapped out",        test_egg_tap },
         { "every state composes clean",   test_frame_all_states },
         { "age is drawn",                 test_age_is_drawn },
+        { "birthday tune",                test_birthday_tune },
         { "overfeed and hatch",           test_overfeed_and_hatch },
     };
     for (unsigned i = 0; i < sizeof tests / sizeof *tests; i++) {
