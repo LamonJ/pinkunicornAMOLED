@@ -448,7 +448,10 @@ static void test_save_restore_units(void)
           "a version-3 adult is refused");
     old_blob = blob; old_blob.version = 4;
     CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
-          "a version-4 pet from the previous flash is refused");
+          "a version-4 pet from an earlier flash is refused");
+    old_blob = blob; old_blob.version = 5;
+    CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
+          "a version-5 pet from the previous flash is refused");
     old_blob = blob; old_blob.pet.stage = (stage_t)99;
     CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
           "a garbage stage is refused");
