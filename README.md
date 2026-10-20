@@ -74,7 +74,7 @@ Energy.
 
 ![Moon meter](docs/meters/moon.png)
 
-It falls while she is awake, about one pip every 8 minutes. A full bar lasts about half an hour, and at empty she falls asleep. She wakes on her own once a pip is back. A nap from the side button keeps her asleep and fills the bar, about one pip every 3 minutes.
+It falls while she is awake, about one pip every 8 minutes. A full bar lasts about half an hour, and at empty she falls asleep until a pip comes back. When the screen goes dark she goes to sleep, and the bar fills, about one pip every 3 minutes, until you tap the glass.
 
 ## When she dies
 

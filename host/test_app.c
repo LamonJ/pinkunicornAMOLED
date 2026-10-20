@@ -230,11 +230,62 @@ static void test_screen_sleep_and_wake(void)
     boot(ST_ROYAL); A.sleep_after_s = 60;
     seconds(70);
     CHECK(A.screen_off, "panel sleeps after a minute idle");
+    CHECK(A.pet.napping && A.pet.asleep, "a dark screen puts her to sleep");
     int b = hb_beeps;
     app_picked_up(&A, hb_now);
     CHECK(!A.screen_off, "picking it up wakes it");
+    CHECK(!A.pet.napping && !A.pet.asleep, "and she wakes with the screen");
     CHECK(hb_beeps > b, "and she greets you");
     CHECK(A.anim == AN_WAKE, "perk reaction");
+}
+
+/* The case hides the side buttons. Leaving the screen dark is how the moon
+ * bar comes back: one pip about every 3 minutes, and a tap wakes her with
+ * whatever filled in. Light sleep does not tick, so the clock jumps. */
+static void test_dark_screen_restores_energy(void)
+{
+    boot(ST_ROYAL);
+    A.pet.energy = 1;
+    A.pet.frac_regen_energy = 0;
+    A.sleep_after_s = 30;
+    seconds(40);
+    CHECK(A.screen_off && A.pet.napping, "she is asleep in the dark");
+
+    seconds(3 * 60);
+    CHECK(A.screen_off, "still dark");
+    CHECK(A.pet.energy >= 2, "ticking while dark fills a pip, got %d",
+          A.pet.energy);
+
+    /* The board path: no ticks, then the clock has moved. */
+    boot(ST_ROYAL);
+    A.pet.energy = 0;
+    A.pet.frac_regen_energy = 0;
+    A.sleep_after_s = 30;
+    seconds(40);
+    CHECK(A.pet.energy == 0, "she has only just nodded off, got %d", A.pet.energy);
+    hb_now += 12LL * 60 * 1000;
+    app_touch(&A, hb_now, 0, 0);
+    CHECK(!A.screen_off, "the tap brings the picture back");
+    CHECK(!A.pet.napping && !A.pet.asleep, "she is awake");
+    CHECK(A.pet.energy == 4, "twelve dark minutes fill an empty bar, got %d",
+          A.pet.energy);
+
+    boot(ST_EGG);
+    A.pet.born_ms = hb_now;
+    A.pet.stage_since_ms = hb_now;
+    A.pet.last_tick_ms = hb_now;
+    A.sleep_after_s = 30;
+    seconds(40);
+    CHECK(A.pet.stage == ST_EGG, "still an egg");
+    CHECK(A.screen_off, "the egg's screen can still go dark");
+    CHECK(!A.pet.napping, "an egg does not nap");
+
+    boot(ST_DEAD);
+    A.pet.stage = ST_DEAD;
+    A.pet.happy = 0;
+    A.sleep_after_s = 30;
+    seconds(40);
+    CHECK(!A.pet.napping, "a dead pet does not nap");
 }
 
 static void test_first_tap_after_wake_is_swallowed(void)
@@ -343,6 +394,7 @@ static void test_age_is_drawn(void)
 static void test_birthday_tune(void)
 {
     boot(ST_BLOB);
+    A.sleep_after_s = 0;             /* this test is the song, not the nap */
     A.pet.born_ms = hb_now;
     A.pet.stage_since_ms = hb_now;
     int before = hb_beeps;
@@ -546,6 +598,7 @@ int main(void)
         { "nap is visible, not blank",    test_nap_is_visible },
         { "nap restores energy",          test_nap_restores_energy },
         { "screen sleep and wake",        test_screen_sleep_and_wake },
+        { "dark screen restores energy",  test_dark_screen_restores_energy },
         { "waking tap is swallowed",      test_first_tap_after_wake_is_swallowed },
         { "roll conditions",              test_roll_conditions },
         { "peek pushes roll out",         test_peek_pushes_roll_out },

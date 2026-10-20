@@ -16,6 +16,7 @@
 #include <Preferences.h>
 #include <driver/gpio.h>
 #include <driver/rtc_io.h>
+#include <soc/rtc.h>
 #include <WiFi.h>
 #include <esp_bt.h>
 
@@ -133,7 +134,16 @@ static bool exp_write(uint8_t reg, uint8_t val)
 /* I2C pins come from pin_config.h as IIC_SDA / IIC_SCL. */
 
 /* ---- time -------------------------------------------------------------- */
-extern "C" int64_t board_now_ms(void) { return (int64_t)millis(); }
+/* millis() is the CPU timer. Light sleep stops that timer, so a dark screen
+ * would otherwise add no time at all and her nap could not fill the moon
+ * bar. The on-chip RTC keeps counting. mono_extra is the time the CPU clock
+ * missed. */
+static int64_t mono_extra = 0;
+
+extern "C" int64_t board_now_ms(void)
+{
+    return (int64_t)millis() + mono_extra;
+}
 
 static SensorPCF85063 rtc;
 static bool rtc_ok = false;
@@ -626,6 +636,9 @@ static bool finger_still_down(void)
 
 extern "C" void board_sleep_until_touched(void)
 {
+    int64_t cpu0 = (int64_t)millis();
+    int64_t rtc0 = (int64_t)(esp_rtc_get_time_us() / 1000);
+
     if (gfx) { gfx->setBrightness(0); gfx->displayOff(); }
     amp_enable(false);
 
@@ -692,6 +705,11 @@ extern "C" void board_sleep_until_touched(void)
 
     gpio_hold_dis((gpio_num_t)PA);
     if (gfx) { gfx->displayOn(); gfx->setBrightness(board_brightness_pct * 255 / 100); }
+
+    int64_t cpu1 = (int64_t)millis();
+    int64_t rtc1 = (int64_t)(esp_rtc_get_time_us() / 1000);
+    int64_t missed = (rtc1 - rtc0) - (cpu1 - cpu0);
+    if (missed > 0) mono_extra += missed;
 }
 
 /* ---- init -------------------------------------------------------------- */

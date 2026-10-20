@@ -165,8 +165,18 @@ static void wake_screen(app_t *a, int64_t now_ms)
 {
     a->idle_last_ms = now_ms;
     if (!a->screen_off) return;
+
+    /* The panel was dark, and the main loop was not ticking. She has been
+     * asleep since it went dark, so credit that stretch before she wakes.
+     * Afterwards the same gap would count as awake time and the moon bar
+     * would fall instead of filling. */
+    if (a->pet.napping)
+        pet_tick(&a->pet, now_ms, 1.0);
+
     a->screen_off = false;
     a->woke_at_ms = now_ms;
+    if (a->pet.napping)
+        pet_set_nap(&a->pet, false, now_ms);
     play(a, AN_WAKE);
     PLAY(SND_WAKE);
 }
@@ -247,8 +257,18 @@ void app_tick(app_t *a, int64_t now_ms)
 
     int timeout = a->pet.napping ? a->nap_sleep_after_s : a->sleep_after_s;
     if (timeout > 0 && !a->screen_off && !app_busy(a) &&
-        now_ms - a->idle_last_ms > (int64_t)timeout * 1000)
+        now_ms - a->idle_last_ms > (int64_t)timeout * 1000) {
         a->screen_off = true;
+        /* The case covers the side buttons, so the dark screen is the nap.
+         * An egg has nothing to restore, and a dead pet stays dead. */
+        if (!a->pet.napping && a->pet.stage != ST_EGG && a->pet.stage != ST_DEAD) {
+            pet_set_nap(&a->pet, true, now_ms);
+            a->roll_on = false;
+            a->peek_on = false;
+            a->anim = AN_NONE;
+            PLAY(SND_NAP);
+        }
+    }
 
     if (a->screen_off || a->pet.stage == ST_DEAD) return;
 
