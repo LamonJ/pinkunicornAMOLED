@@ -16,8 +16,18 @@
 #include <Preferences.h>
 #include <driver/gpio.h>
 #include <driver/rtc_io.h>
-#include <soc/rtc.h>
 #include <WiFi.h>
+/* Core 3.3 (ESP-IDF 5.5) moved esp_rtc_get_time_us out of soc/rtc.h.
+ * esp_rtc_time.h is the header that declares it. Older cores still
+ * declared it from soc/rtc.h, so keep that as a fallback. */
+#if defined(__has_include) && __has_include(<esp_rtc_time.h>)
+#  include <esp_rtc_time.h>
+#elif defined(__has_include) && __has_include(<soc/rtc.h>)
+#  include <soc/rtc.h>
+#endif
+#if !defined(__has_include) || !__has_include(<esp_rtc_time.h>)
+extern "C" uint64_t esp_rtc_get_time_us(void);
+#endif
 #include <esp_bt.h>
 
 /* Display: the same stack Waveshare's own Arduino examples use.
