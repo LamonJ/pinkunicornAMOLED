@@ -144,8 +144,15 @@ Board: **ESP32S3 Dev Module**. Settings that matter:
 | Partition Scheme | 16M Flash (3MB APP/9.9MB FATFS), or another 16MB scheme |
 | USB CDC On Boot | Enabled, so `Serial` works |
 
-Install these three from Library Manager: **GFX Library for Arduino**,
-**SensorLib**, **XPowersLib**.
+Install these three from Library Manager. Search for the name in the first column.
+
+| Library Manager name | What it is for |
+|---|---|
+| GFX Library for Arduino | The round display |
+| SensorLib | Touch and the clock |
+| XPowersLib | The battery chip |
+
+Wire, Preferences, WiFi, and the I2S speaker class come with the ESP32 board package. The ES8311 speaker driver is already in the sketch folder.
 
 `python3 tools/make_arduino.py` rewrites `arduino/Sprinkles/` from
 `sprinkles/` and `arduino_src/` after you edit those. The sketch folder is
@@ -205,7 +212,7 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | Battery | AXP2101 via XPowersLib, read-only |
 | Grown-up screen | both buttons held 5 s, native-resolution text |
 
-**Libraries to install:** *GFX Library for Arduino*, *SensorLib* and *XPowersLib*.
+The three Library Manager installs are listed under Arduino IDE.
 `pin_config.h` is already in `arduino/Sprinkles/`.
 
 `board_esp32.c` is the ESP-IDF variant and still has its `TODO(bsp)` holes —
