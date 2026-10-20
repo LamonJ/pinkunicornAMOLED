@@ -185,17 +185,17 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
         return;
     }
 
-    /* Only two ways to be asleep: you put her there, or she is exhausted -
-     * and even exhaustion yields to a manual wake for half an hour, so a
-     * button press is never a no-op. */
-    bool exhausted = p->energy == 0 && now_ms >= p->wake_until_ms;
-    p->asleep = p->napping || exhausted;
-
     /* Slice the elapsed time so a single catch-up after hours (or days) of
      * deep sleep lands on exactly the same state as ticking once a minute
      * would have. Without this, coming back from the RTC gives a different
      * pet than never switching off — the one bug in here that would have
      * been genuinely hard to spot on hardware.
+     *
+     * Sleep is part of that. It is decided at the start of each minute,
+     * from the energy she has then, and the next minute sees whatever that
+     * minute did to the bar. Checking it once for the whole absence would
+     * keep her awake (and draining) straight through a nap she should have
+     * taken in the first half hour.
      *
      * 8 h off is 480 iterations. A month is ~43k. Both are free. */
     const double MAX_STEPS = 200000.0;
@@ -204,6 +204,12 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
 
     double left = dt;
     while (left > 0) {
+        /* Only two ways to be asleep: you put her there, or she is exhausted -
+         * and even exhaustion yields to a manual wake for half an hour, so a
+         * button press is never a no-op. */
+        bool exhausted = p->energy == 0 && now_ms >= p->wake_until_ms;
+        p->asleep = p->napping || exhausted;
+
         double step = (left > slice) ? slice : left;
         needs_step(p, step);
         left -= step;

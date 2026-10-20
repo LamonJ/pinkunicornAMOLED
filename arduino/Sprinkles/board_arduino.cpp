@@ -613,10 +613,31 @@ extern "C" void board_deep_sleep(void)
     esp_deep_sleep_start();          /* never returns */
 }
 
+/* Turning the panel off blips TP_INT (active low). Treating every non-timer
+ * wake as a person switches the screen straight back on. A finger has to
+ * still be there on two reads, or a side button has to be down. */
+static bool finger_still_down(void)
+{
+    double px, py;
+    if (!board_touch(&px, &py)) return false;
+    delay(40);
+    return board_touch(&px, &py);
+}
+
 extern "C" void board_sleep_until_touched(void)
 {
     if (gfx) { gfx->setBrightness(0); gfx->displayOff(); }
     amp_enable(false);
+
+    /* The panel-off blip lands in the touch controller as well as on the
+     * pin. Throw those samples away before arming the wake, or the first
+     * poll looks like a tap. */
+    delay(60);
+    {
+        double px, py;
+        board_touch(&px, &py);
+        board_touch(&px, &py);
+    }
 
     /* Latch the amplifier-enable pin LOW for the duration.
      *
@@ -640,26 +661,33 @@ extern "C" void board_sleep_until_touched(void)
         rtc_gpio_pulldown_dis((gpio_num_t)PIN_BOOT);
     }
 
-    const uint64_t mask = (1ULL << TP_INT) | (1ULL << PIN_BOOT);
+    const uint64_t touch_and_boot = (1ULL << TP_INT) | (1ULL << PIN_BOOT);
+    const uint64_t boot_only = (1ULL << PIN_BOOT);
+    /* A stuck-low TP_INT would otherwise wake light sleep the instant it
+     * starts, forever. After one ghost, listen only to BOOT plus the timer. */
+    bool trust_touch = true;
 
     for (;;) {
-        esp_sleep_enable_ext1_wakeup(mask, ESP_EXT1_WAKEUP_ANY_LOW);
+        esp_sleep_enable_ext1_wakeup(trust_touch ? touch_and_boot : boot_only,
+                                     ESP_EXT1_WAKEUP_ANY_LOW);
         esp_sleep_enable_timer_wakeup(SLEEP_POLL_US);
         esp_light_sleep_start();
 
         esp_sleep_wakeup_cause_t why = esp_sleep_get_wakeup_cause();
-        if (why != ESP_SLEEP_WAKEUP_TIMER) break;      /* interrupt: instant */
 
-        /* Timer: poll everything that cannot raise an interrupt we can hear.
-         * Touch is polled as well as interrupt-driven precisely because the
-         * interrupt alone was missing taps. */
-        double px, py;
-        if (board_touch(&px, &py)) break;
         if (board_button_down(0)) break;
 #if SLEEP_PICKUP_POLL
         if (board_picked_up()) break;                  /* lifted */
         if (board_button_down(1)) break;               /* PWR */
 #endif
+        /* Timer or interrupt: a real finger is still down. One sample is
+         * not enough — the panel-off edge looks like a contact. */
+        if (finger_still_down()) break;
+
+        if (trust_touch && why != ESP_SLEEP_WAKEUP_TIMER) {
+            trust_touch = false;
+            Serial.println("[sleep] touch irq ignored, polling");
+        }
     }
 
     gpio_hold_dis((gpio_num_t)PA);

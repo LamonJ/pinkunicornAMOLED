@@ -47,7 +47,10 @@ extern const char  *PET_STAGE_NAME[ST_COUNT];
 extern const double PET_HUNGER_MIN[5];
 
 #define PET_DECAY_HAPPY  190.0
-#define PET_DECAY_ENERGY 230.0
+/* Awake, the moon loses a pip every 8 minutes. Full to asleep is about
+ * half an hour, which is long enough to play and short enough to notice.
+ * At 230 minutes a pip the bar looked frozen for a whole afternoon. */
+#define PET_DECAY_ENERGY   8.0
 /* Hearts refill while she's fed and her floor is clean.
  *
  * This had to come down hard once hunger got its fast first drop: at 100

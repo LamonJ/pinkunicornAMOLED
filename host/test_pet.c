@@ -23,6 +23,20 @@ static void advance(pet_t *p, double minutes, int64_t *now)
     }
 }
 
+/* Same clock, but she stays awake. Hunger and heart timings are specified
+ * for an awake pet; once the moon bar empties she sleeps and those drops
+ * slow down, which is a different rule. */
+static void advance_awake(pet_t *p, double minutes, int64_t *now)
+{
+    for (int i = 0; i < (int)minutes; i++) {
+        p->energy = 4;
+        p->frac_energy = 0;
+        p->napping = false;
+        *now += MIN(1);
+        pet_tick(p, *now, 1.0);
+    }
+}
+
 /* A long wait that is about the growth clock, not about starving.
  * Top her up often enough that the heart bar cannot reach 0. */
 static void age_cared_for(pet_t *p, double minutes, int64_t *now)
@@ -187,7 +201,9 @@ static void test_neglect_kills(void)
     CHECK(p.hunger >= 0 && p.energy >= 0, "other meters stay in range");
     CHECK(!p.asleep && !p.napping, "death is not sleep");
 
-    /* One long catch-up must land on the same death as minute steps. */
+    /* One long catch-up must land on the same death as minute steps.
+     * Two hearts at the awake rate is about 380 minutes, but an empty moon
+     * puts her to sleep and slows the drop, so this window is longer. */
     pet_t a, b; int64_t t0 = 0;
     pet_init(&a, t0); pet_init(&b, t0);
     a.stage = b.stage = ST_ROYAL;
@@ -195,8 +211,8 @@ static void test_neglect_kills(void)
     a.happy = b.happy = 2;
     a.frac_happy = b.frac_happy = 0;
     int64_t t = t0;
-    for (int i = 0; i < 400; i++) { t += MIN(1); pet_tick(&a, t, 1.0); }
-    pet_tick(&b, t0 + MIN(400), 1.0);
+    for (int i = 0; i < 520; i++) { t += MIN(1); pet_tick(&a, t, 1.0); }
+    pet_tick(&b, t0 + MIN(520), 1.0);
     CHECK(a.stage == ST_DEAD && b.stage == ST_DEAD, "both paths die");
     CHECK(a.happy == b.happy && a.energy == b.energy && a.hunger == b.hunger,
           "stepwise %d/%d/%d vs catch-up %d/%d/%d",
@@ -229,8 +245,31 @@ static void test_happy_follows_care(void)
 
     /* a mess on the floor stops it and starts the slide */
     p.happy = 3; p.mess = 1; p.mess_x[0] = 13; p.frac_happy = 0;
-    advance(&p, 200, &now);
+    advance_awake(&p, 200, &now);
     CHECK(p.happy == 2, "hearts drain while messy, got %d", p.happy);
+}
+
+/* Awake, the moon bar has to move during a play session. One pip in 8
+ * minutes, empty in half an hour, and the next tick is when she nods off
+ * (sleep is decided at the start of a tick, from the energy she already has). */
+static void test_awake_energy_drops(void)
+{
+    pet_t p; int64_t now = 0; pet_init(&p, now);
+    advance(&p, 2, &now);
+    p.energy = 4;
+    p.frac_energy = 0;
+    p.napping = false;
+
+    advance(&p, 8, &now);
+    CHECK(p.energy == 3, "one pip in 8 min, got %d", p.energy);
+    CHECK(!p.asleep, "still up after the first pip");
+
+    advance(&p, 24, &now);
+    CHECK(p.energy == 0, "empty after half an hour awake, got %d", p.energy);
+    CHECK(!p.asleep, "the tick that empties her is still awake");
+
+    advance(&p, 1, &now);
+    CHECK(p.asleep && !p.napping, "the next tick she is asleep from exhaustion");
 }
 
 /* A nap has to pay off inside a four-year-old's attention span: the first
@@ -467,13 +506,13 @@ static void test_graded_rates(void)
     advance(&p, 2, &now);
     p.hunger = 4; p.frac_hunger = 0; p.mess = 0;
 
-    advance(&p, 6, &now);
+    advance_awake(&p, 6, &now);
     CHECK(p.hunger == 3, "first cupcake gone within 6 min, got %d", p.hunger);
 
-    advance(&p, 30, &now);
+    advance_awake(&p, 30, &now);
     CHECK(p.hunger == 3, "and the second is NOT gone 36 min in, got %d",
           p.hunger);
-    advance(&p, 35, &now);
+    advance_awake(&p, 35, &now);
     CHECK(p.hunger == 2, "second goes at about an hour, got %d", p.hunger);
 
     /* Feeding restarts the clock rather than instantly losing the new pip.
@@ -485,11 +524,11 @@ static void test_graded_rates(void)
     CHECK(p.hunger == 4, "a fresh feed is not eaten by old credit, got %d",
           p.hunger);
 
-    /* She must not starve: six hours to empty from full. */
+    /* She must not starve: six hours to empty from full, awake. */
     p.hunger = 4; p.frac_hunger = 0;
-    advance(&p, 300, &now);
+    advance_awake(&p, 300, &now);
     CHECK(p.hunger >= 1, "still has a pip after 5 h, got %d", p.hunger);
-    advance(&p, 120, &now);
+    advance_awake(&p, 120, &now);
     CHECK(p.hunger == 0, "empty by about 7 h, got %d", p.hunger);
     CHECK(p.frac_hunger == 0, "and does not bank credit at zero");
 }
@@ -523,6 +562,7 @@ int main(void)
         { "neglect kills",             test_neglect_kills },
         { "feed results",              test_feed_results },
         { "happy follows care",        test_happy_follows_care },
+        { "awake energy drops",        test_awake_energy_drops },
         { "nap restores energy fast",  test_sleep_restores_energy_fast },
         { "no clock-driven bedtime",   test_no_clock_bedtime },
         { "wake beats exhaustion",     test_manual_wake_beats_exhaustion },
