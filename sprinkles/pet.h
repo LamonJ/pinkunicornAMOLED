@@ -114,11 +114,11 @@ void   pet_init(pet_t *p, int64_t now_ms);
  * is exactly the bug this pair of functions exists to prevent: the blob
  * stores DURATIONS plus the wall time it was written, never a raw monotonic
  * stamp. Round-tripped in host/test_pet.c. */
-/* 4 discards pets saved by earlier builds. An Arduino upload leaves the
- * NVS partition alone, so a version-3 blob was restoring a fully grown
- * cat and the egg never appeared. A flash of this build starts at the egg.
- * Later boots of the same build keep her. */
-#define PET_SAVE_VERSION 4
+/* 5 discards pets saved by builds 4 and earlier. An Arduino upload leaves
+ * the NVS partition alone, so the previous blob was restoring the same pet
+ * after a fresh flash. A flash of this build starts at the egg. Later boots
+ * of the same build keep her. */
+#define PET_SAVE_VERSION 5
 
 typedef struct {
     uint32_t version;
