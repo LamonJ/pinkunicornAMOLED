@@ -34,10 +34,19 @@ static const spr_note_t SND_PEEK[]     = { {1250,120},{950,120},{700,170} };
 static const spr_note_t SND_PEEK_BACK[]= { {820,180} };
 static const spr_note_t SND_PEEK_HOME[]= { {1000,140},{1350,220} };
 static const spr_note_t SND_DANCE[]    = { {800,130},{1000,130},{1250,150},{1500,200} };
-/* A short rising phrase when the number under her paws goes up.
- * Long enough to hear as a tune, short enough that one birthday
- * does not freeze the picture. */
-static const spr_note_t SND_BIRTHDAY[] = { {523,150},{659,150},{784,150},{1046,280} };
+/* Happy Birthday, sung. The melody is old enough to be free to use.
+ * A birthday is the one moment the picture may sit still: the song
+ * is the celebration, and it runs about thirteen seconds. */
+static const spr_note_t SND_BIRTHDAY[] = {
+    /* Happy birthday to you */
+    {392,250},{392,250},{440,500},{392,500},{523,500},{494,1000},{0,250},
+    /* Happy birthday to you */
+    {392,250},{392,250},{440,500},{392,500},{587,500},{523,1000},{0,250},
+    /* Happy birthday, dear Sprinkles */
+    {392,250},{392,250},{784,500},{659,500},{523,500},{494,500},{440,1000},{0,250},
+    /* Happy birthday to you */
+    {698,250},{698,250},{659,500},{523,500},{587,500},{523,1200},
+};
 /* Things she does on her own that used to happen in silence. */
 static const spr_note_t SND_POOP[]     = { {520,170},{380,230} };
 static const spr_note_t SND_READY[]    = { {900,140},{1200,140},{1500,160},{1900,260} };
@@ -216,10 +225,10 @@ void app_tick(app_t *a, int64_t now_ms)
         a->dance_until = (double)now_ms + 5500;
     }
 
-    /* One tune per time the displayed age goes up, including a jump of
+    /* One song per time the displayed age goes up, including a jump of
      * several years in a single tick. The first sample after boot is
      * silent, so switching her on does not celebrate the age she already is.
-     * 100 stays, so the tune stops there. */
+     * 100 stays, so the song stops there. */
     {
         int age_now = pet_sim_age(&a->pet, now_ms);
         if (a->birthday_age < 0)

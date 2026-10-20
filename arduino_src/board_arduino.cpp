@@ -182,7 +182,7 @@ extern "C" double board_rand01(void)
  * it and nothing else in the project changes. */
 #define AUDIO_RATE     16000
 #define AUDIO_AMP       6000    /* of 32767; matches the prototype's 0.06 */
-#define NOTE_MAX_MS      400    /* headroom over the longest note (300) */
+#define NOTE_MAX_MS     1400    /* the birthday song holds its last note */
 #define NOTE_MAX_FRAMES (AUDIO_RATE * NOTE_MAX_MS / 1000)
 #define AUDIO_VOLUME      75    /* 0..100 into the codec */
 
@@ -299,6 +299,9 @@ extern "C" void board_beep(const spr_note_t *notes, int count)
             note_buf[i * 2 + 1] = v;
         }
         i2s.write((uint8_t *)note_buf, (size_t)frames * 2 * sizeof(int16_t));
+        /* A birthday song is many seconds. delay() keeps the task watchdog
+         * fed between notes; a bare 13 s write would reset the board. */
+        delay(1);
     }
 
     write_silence(15);                  /* let the tail out before muting */

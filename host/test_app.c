@@ -11,7 +11,7 @@ extern double  hb_rand_ring[8];
 extern int     hb_rand_ring_n;
 extern int     hb_rand_i;
 extern int     hb_beeps, hb_slept;
-extern spr_note_t hb_last_beep[8];
+extern spr_note_t hb_last_beep[48];
 extern int     hb_last_beep_n;
 
 static int fails = 0, checks = 0;
@@ -357,10 +357,18 @@ static void test_birthday_tune(void)
     seconds(60);
     CHECK(pet_sim_age(&A.pet, hb_now) == 1, "20 min is 1, got %d",
           pet_sim_age(&A.pet, hb_now));
-    CHECK(hb_beeps == before + 1, "one tune for the birthday, got %d extra",
+    CHECK(hb_beeps == before + 1, "one song for the birthday, got %d extra",
           hb_beeps - before);
-    CHECK(hb_last_beep_n == 4 && hb_last_beep[0].hz == 523
-          && hb_last_beep[3].hz == 1046, "it is the rising phrase");
+    int sung = 0;
+    for (int i = 0; i < hb_last_beep_n; i++) sung += hb_last_beep[i].ms;
+    CHECK(hb_last_beep_n >= 24, "the birthday is a song, got %d notes",
+          hb_last_beep_n);
+    CHECK(sung >= 10000, "it lasts for the celebration, got %d ms", sung);
+    CHECK(hb_last_beep[0].hz == 392 && hb_last_beep[2].hz == 440
+          && hb_last_beep[5].hz == 494, "it opens with Happy Birthday");
+    CHECK(hb_last_beep[hb_last_beep_n - 1].hz == 523
+          && hb_last_beep[hb_last_beep_n - 1].ms >= 1000,
+          "and the last note is held");
 
     before = hb_beeps;
     seconds(20 * 60);
