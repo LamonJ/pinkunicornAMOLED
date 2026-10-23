@@ -34,9 +34,8 @@ bool board_audio_ok(void);
 bool board_pwr_ok(void);
 
 /* ---- battery (AXP2101) ------------------------------------------------
- * percent is -1 when no cell is attached. Read-only on purpose: charge
- * current and target voltage are left exactly as the board ships them,
- * because getting those wrong on a lithium cell is not a software bug. */
+ * percent is -1 when no cell is attached. Charge current and the registers
+ * that keep the cell powering the board live in the Arduino board code. */
 void board_battery(int *percent, int *millivolts, bool *charging, bool *present);
 
 /* ---- grown-up screen --------------------------------------------------

@@ -88,6 +88,7 @@ extern "C" {
 
 /* Battery telemetry. Library Manager -> "XPowersLib". */
 #include "XPowersLib.h"
+#include "pmu_hold.h"
 
 extern "C" {
 #include "board.h"
@@ -149,10 +150,20 @@ static bool exp_write(uint8_t reg, uint8_t val)
  * bar. The on-chip RTC keeps counting. mono_extra is the time the CPU clock
  * missed. */
 static int64_t mono_extra = 0;
+static bool pmu_ok = false;
+static void pmu_hold_battery(bool log_it);
 
 extern "C" int64_t board_now_ms(void)
 {
-    return (int64_t)millis() + mono_extra;
+    int64_t now = (int64_t)millis() + mono_extra;
+    /* The charger can set its "done" bit again later. Put the hold back
+     * once a second so unplugging USB still has the cell connected. */
+    static int64_t hold_at = -10000;
+    if (pmu_ok && now - hold_at >= 1000) {
+        hold_at = now;
+        pmu_hold_battery(false);
+    }
+    return now;
 }
 
 static SensorPCF85063 rtc;
@@ -487,7 +498,6 @@ extern "C" bool board_picked_up(void)
 
 /* ---- battery ----------------------------------------------------------- */
 static XPowersPMU pmu;
-static bool pmu_ok = false;
 
 extern "C" void board_battery(int *percent, int *mv, bool *charging, bool *present)
 {
@@ -750,72 +760,72 @@ auto spr_enable_cell_charge(T &chip, long)
 template <typename T>
 void spr_enable_cell_charge(T &, ...) {}
 
-/* When charging reports done, the AXP2101 opens the battery path and runs
- * from USB alone. Unplugging the cable then drops the board. Keep that path
- * closed, set the charger floor on the system rail to 4.1 V so a 3.7 V cell
- * can hold it, and ignore a one-percent fuel-gauge reading and a short dip
- * on the regulators. Regulator voltages, the USB current limit, and the
- * six-second power button stay as the chip already has them.
- *
- * Each call is optional: Library Manager copies of XPowersLib spell a few of
- * these differently, and a missing one must not fail the build. */
-template <typename T>
-auto spr_keep_battery_path(T &chip, int)
-    -> decltype(chip.disableChargerTerminationLimit(), void())
+/* Write the hold registers on the bus. Library helpers for these bits are
+ * spelled differently across XPowersLib versions, and a skipped call leaves
+ * the chip shutting off when the cable is pulled. */
+static int pmu_rd(uint8_t reg)
 {
-    chip.disableChargerTerminationLimit();
+    Wire.beginTransmission(AXP2101_SLAVE_ADDRESS);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) return -1;
+    if (Wire.requestFrom((int)AXP2101_SLAVE_ADDRESS, 1) != 1) return -1;
+    return Wire.read();
 }
-template <typename T>
-void spr_keep_battery_path(T &, ...) {}
 
-template <typename T, typename Step>
-auto spr_vsys_floor(T &chip, Step step, int)
-    -> decltype(chip.setLinearChargerVsysDpm(step), void())
+static bool pmu_wr(uint8_t reg, uint8_t val)
 {
-    chip.setLinearChargerVsysDpm(step);
+    Wire.beginTransmission(AXP2101_SLAVE_ADDRESS);
+    Wire.write(reg);
+    Wire.write(val);
+    return Wire.endTransmission() == 0;
 }
-template <typename T, typename Step>
-void spr_vsys_floor(T &, Step, ...) {}
 
-template <typename T>
-auto spr_vsys_off_2600(T &chip, int)
-    -> decltype(chip.setSysPowerDownVoltage((uint16_t)2600), void())
-{
-    chip.setSysPowerDownVoltage(2600);
-}
-template <typename T>
-void spr_vsys_off_2600(T &, ...) {}
+static const uint8_t PMU_HOLD_ADDRS[] = {
+    0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50, 0x56, 0x57, 0x63, 0x68
+};
 
-template <typename T>
-auto spr_gauge_shutdown_off(T &chip, int)
-    -> decltype(chip.setLowBatShutdownThreshold((uint8_t)0), void())
+static void pmu_hold_battery(bool log_it)
 {
-    chip.setLowBatShutdownThreshold(0);
+    for (unsigned i = 0; i < sizeof PMU_HOLD_ADDRS; i++) {
+        uint8_t addr = PMU_HOLD_ADDRS[i];
+        int cur = pmu_rd(addr);
+        if (cur < 0) {
+            if (log_it) Serial.printf("PMU 0x%02X read failed\n", addr);
+            continue;
+        }
+        uint8_t next = pmu_hold_apply(addr, (uint8_t)cur);
+        if ((uint8_t)cur != next && !pmu_wr(addr, next) && log_it)
+            Serial.printf("PMU 0x%02X write failed\n", addr);
+        if (log_it) {
+            int now = pmu_rd(addr);
+            Serial.printf("PMU 0x%02X %02X -> %02X\n", addr, cur, now < 0 ? 0 : now);
+        }
+    }
 }
-template <typename T>
-void spr_gauge_shutdown_off(T &, ...) {}
 
-template <typename T>
-auto spr_ignore_rail_dip(T &chip, int)
-    -> decltype(chip.disableDC1LowVoltageTurnOff(), void())
+/* ADC is 1 mV per step. Read the high byte first, which is what the chip
+ * requires, and do not ask the library: it reports 0 mV whenever its
+ * "battery present" bit is still clear. */
+static int pmu_cell_mv(void)
 {
-    chip.disableDC1LowVoltageTurnOff();
-    chip.disableDC2LowVoltageTurnOff();
-    chip.disableDC3LowVoltageTurnOff();
-    chip.disableDC4LowVoltageTurnOff();
-    chip.disableDC5LowVoltageTurnOff();
+    int hi = pmu_rd(0x34);
+    int lo = pmu_rd(0x35);
+    if (hi < 0 || lo < 0) return -1;
+    return ((hi & 0x3F) << 8) | (lo & 0xFF);
 }
-template <typename T>
-void spr_ignore_rail_dip(T &, ...) {}
 
-template <typename T>
-auto spr_watchdog_off(T &chip, int)
-    -> decltype(chip.disableWatchdog(), void())
+/* A finished charge opens the battery switch and leaves the rails on USB
+ * only. Turning the charger off and straight back on leaves that "done"
+ * state, so the switch is closed before the cable is pulled. */
+static void pmu_reclose_battery(void)
 {
-    chip.disableWatchdog();
+    int en = pmu_rd(0x18);
+    if (en < 0) return;
+    uint8_t off = (uint8_t)(en & ~0x02);
+    if (!pmu_wr(0x18, off)) return;
+    delay(30);
+    pmu_wr(0x18, (uint8_t)(off | 0x02));
 }
-template <typename T>
-void spr_watchdog_off(T &, ...) {}
 
 extern "C" void board_init(void)
 {
@@ -939,17 +949,18 @@ extern "C" void board_init(void)
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
         spr_enable_cell_charge(pmu, 0);
-        spr_keep_battery_path(pmu, 0);
-        spr_vsys_floor(pmu, XPOWERS_AXP2101_VSYS_VOL_4V1, 0);
-        spr_vsys_off_2600(pmu, 0);
-        spr_gauge_shutdown_off(pmu, 0);
-        spr_ignore_rail_dip(pmu, 0);
-        spr_watchdog_off(pmu, 0);
-        Serial.printf("PMU OK, battery %s, %d mV, charge %s\n",
-                      pmu.isBatteryConnect() ? "present" : "absent",
-                      pmu.getBattVoltage(),
-                      pmu.isCharging() ? "on" : "idle");
-        Serial.println("PMU: unplugging USB leaves the battery running the board");
+        /* After the library calls, so a setter cannot turn the hold back off.
+         * Then leave charge-done, which is the state that opens the switch. */
+        pmu_hold_battery(true);
+        pmu_reclose_battery();
+        delay(50);
+        int cell = pmu_cell_mv();
+        if (cell >= 3000) {
+            Serial.printf("PMU cell %d mV. Unplugging USB keeps her on.\n", cell);
+        } else {
+            Serial.printf("PMU cell %d mV. Red wire goes on the + mark.\n",
+                          cell < 0 ? 0 : cell);
+        }
     }
 
     /* I/O expander, for the PWR button on EXIO4. */

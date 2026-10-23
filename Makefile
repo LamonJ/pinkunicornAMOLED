@@ -31,8 +31,12 @@ test-blit: test_blit
 test_app: host/test_app.c host/board_host.c $(CORE) sprinkles/app.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
-test: test_pet
+test_pmu: host/test_pmu_hold.c arduino_src/pmu_hold.h
+	$(CC) $(CFLAGS) -o $@ host/test_pmu_hold.c
+
+test: test_pet test_pmu
 	./test_pet
+	./test_pmu
 
 test-app: test_app
 	./test_app
@@ -50,6 +54,6 @@ round: round_preview
 	./round_preview out
 
 clean:
-	rm -rf test_pet test_app test_clock test_blit host_golden round_preview out diff.png
+	rm -rf test_pet test_pmu test_app test_clock test_blit host_golden round_preview out diff.png
 
 .PHONY: all test test-app test-clock test-blit golden round clean
