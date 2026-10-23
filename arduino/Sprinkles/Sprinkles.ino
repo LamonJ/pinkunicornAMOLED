@@ -40,7 +40,6 @@ static app_t app;
 static int64_t last_frame, last_tick, last_save;
 static bool    touch_was_down = false;
 static double  down_x = 0, down_y = 0, last_x = 0, last_y = 0;
-static int64_t down_at = 0;
 
 static void load_state(int64_t now_ms)
 {
@@ -231,7 +230,7 @@ void setup()
     Serial.printf ("RTC     : %s\n", board_rtc_ok()   ? "OK" : "FAILED");
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
-    Serial.println("tap the top left = feed | tap the bottom = sweep | tap MUTE = sound");
+    Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",
@@ -379,13 +378,13 @@ after_input:;
         app_picked_up(&app, now);
     }
 
-    /* A real tap: pressed and released quickly. A small finger slides, so
-     * twenty world pixels (about 140 on the glass) still counts. A finished
-     * mute hold does not. */
+    /* Where the finger went down is the tap. A small finger slides off the
+     * cake, and pressing until something happens used to run past the old
+     * time limit and get thrown away. A finished mute hold is the exception. */
     double tx = 0, ty = 0;
     bool down = board_touch(&tx, &ty);
     if (down) { last_x = tx; last_y = ty; }
-    if (down && !touch_was_down) { down_x = tx; down_y = ty; down_at = now; }
+    if (down && !touch_was_down) { down_x = tx; down_y = ty; }
     if (down && app_hold(&app, now, 1, tx, ty)) {
         Serial.println(app.pet.sound ? "[mute] sound on" : "[mute] sound off");
         save_state();
@@ -394,18 +393,18 @@ after_input:;
     /* A hold that muted must not also count as a tap when the finger lifts. */
     bool held = app.hold_fired;
     if (!down) app_hold(&app, now, 0, 0, 0);
-    if (!down && touch_was_down && !held &&
-        now - down_at < 700 &&
-        fabs(last_x - down_x) < 20 && fabs(last_y - down_y) < 20) {
-        Serial.printf("[tap] raw %d,%d -> world %.1f,%.1f\n",
-                      board_touch_raw_x, board_touch_raw_y, down_x, down_y);
+    if (!down && touch_was_down && !held) {
+        Serial.printf("[tap] raw %d,%d -> world %.1f,%.1f  slide %.0f,%.0f\n",
+                      board_touch_raw_x, board_touch_raw_y, down_x, down_y,
+                      fabs(last_x - down_x), fabs(last_y - down_y));
         int pending = app.act_pending;
         stage_t before = app.pet.stage;
         app_touch(&app, now, down_x, down_y);
         if (app.act_pending == 1 && pending != 1) Serial.println("[tap] -> feed");
         if (app.act_pending == 2 && pending != 2) Serial.println("[tap] -> sweep");
         /* Save straight away after anything a child would notice losing. */
-        if (app.pet.stage != before || app.anim == AN_EAT || app.evo_queued) {
+        if (app.pet.stage != before || app.anim == AN_EAT || app.evo_queued ||
+            pending != app.act_pending) {
             save_state();
             last_save = now;
         }

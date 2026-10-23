@@ -551,11 +551,14 @@ static bool on_mess(const app_t *a, double wx, double wy)
     return false;
 }
 
-/* Hunger cake and its pips. The moon icon starts at x=33, so this stays
- * in the top left and a press on the moon does not feed her. */
+/* The cake is a 5px icon in the top corner of a round glass, and the case
+ * lip covers that corner. A finger aimed at it lands anywhere across the
+ * top, including on the moon. Her body sits lower, around y=39, so the top
+ * of the glass feeds and a tap on her belly still pets. */
 static bool on_cake_meter(double wx, double wy)
 {
-    return wx >= 0 && wx <= 32 && wy >= 0 && wy <= 20;
+    (void)wx;
+    return wy <= 31.0;
 }
 
 /* The word MUTE, under the meters. Only drawn while the speaker is off. */
@@ -588,6 +591,10 @@ bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
         return false;
     }
     if (a->hold_fired) return false;
+    /* A press on the cake or a pile is the feed or the sweep, even when
+     * the finger stays down. Muting here was swallowing that tap. */
+    if (on_cake_meter(a->hold_x, a->hold_y) || on_mess(a, a->hold_x, a->hold_y))
+        return false;
     double dx = x - a->hold_x, dy = y - a->hold_y;
     if (dx * dx + dy * dy > 25.0) {
         /* A moving finger is not a mute. Leave hold_fired clear so the

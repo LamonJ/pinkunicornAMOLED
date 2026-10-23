@@ -522,9 +522,9 @@ static void test_sleeping_tap_wakes_and_acts(void)
     CHECK(A.act_pending == 0, "and does not feed");
 }
 
-/* A small finger does not land on the sprite. The top left feeds. The
- * bottom of the glass sweeps whenever there is poop, even away from the
- * pile's x. The moon stays a moon. */
+/* The cake is a few pixels in the corner. The whole top of the glass feeds,
+ * including the moon side and a press that lands below the icon. The bottom
+ * still sweeps, and her belly does not feed. */
 static void test_generous_cake_and_bottom(void)
 {
     boot(ST_ROYAL);
@@ -536,8 +536,20 @@ static void test_generous_cake_and_bottom(void)
 
     boot(ST_ROYAL);
     A.pet.hunger = 2;
-    app_touch(&A, hb_now, 40, 12);
-    CHECK(A.act_pending == 0, "the moon is not the cake");
+    app_touch(&A, hb_now, 58, 6);
+    CHECK(A.act_pending == 1, "the top right feeds too");
+    frames(1100);
+    CHECK(A.pet.hunger == 3, "the moon-side tap fed her, got %d", A.pet.hunger);
+
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 8, 30);
+    CHECK(A.act_pending == 1, "a press below the icon still feeds");
+
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 32, 40);
+    CHECK(A.act_pending == 0, "her belly is not the cake");
     CHECK(A.pet.hunger == 2, "hunger unchanged");
 
     boot(ST_ROYAL);
@@ -553,8 +565,18 @@ static void test_generous_cake_and_bottom(void)
     boot(ST_ROYAL);
     A.pet.mess = 1;
     A.pet.mess_x[0] = 13;
-    app_touch(&A, hb_now, 40, 30);
-    CHECK(A.act_pending == 0, "a high tap away from the pile does not sweep");
+    A.pet.hunger = 1;
+    app_touch(&A, hb_now, 48, 40);
+    CHECK(A.act_pending == 0, "her side does not sweep");
+    CHECK(A.pet.hunger == 1, "and does not feed");
+
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    A.pet.sound = true;
+    CHECK(!app_hold(&A, hb_now, 1, 12, 12), "finger down on the cake");
+    CHECK(!app_hold(&A, hb_now + APP_HOLD_MS, 1, 14, 12), "holding the cake does not mute");
+    CHECK(A.pet.sound, "sound stays on");
+    CHECK(!A.hold_fired, "lifting off the cake can still feed");
 }
 
 /* A still hold mutes. Another hold brings the sound back. The word MUTE
@@ -565,13 +587,13 @@ static void test_hold_mutes(void)
     int64_t t = hb_now;
     int beeps = hb_beeps;
     CHECK(A.pet.sound && hb_audio, "sound starts on");
-    CHECK(!app_hold(&A, t, 1, 30, 30), "putting the finger down is not a mute");
-    CHECK(!app_hold(&A, t + APP_HOLD_MS - 1, 1, 31, 30), "a short hold waits");
+    CHECK(!app_hold(&A, t, 1, 32, 44), "putting the finger down is not a mute");
+    CHECK(!app_hold(&A, t + APP_HOLD_MS - 1, 1, 33, 44), "a short hold waits");
     CHECK(A.pet.sound, "still heard");
-    CHECK(app_hold(&A, t + APP_HOLD_MS, 1, 31, 31), "the long hold mutes");
+    CHECK(app_hold(&A, t + APP_HOLD_MS, 1, 32, 45), "the long hold mutes");
     CHECK(!A.pet.sound && !hb_audio, "speaker is off");
     CHECK(hb_beeps == beeps, "muting itself is silent");
-    CHECK(!app_hold(&A, t + APP_HOLD_MS + 400, 1, 31, 31), "holding longer does not toggle again");
+    CHECK(!app_hold(&A, t + APP_HOLD_MS + 400, 1, 32, 45), "holding longer does not toggle again");
     CHECK(A.hold_fired, "the release should not also be a tap");
 
     app_frame(&A, 0, hb_now);
@@ -579,10 +601,10 @@ static void test_hold_mutes(void)
     CHECK(gfx_dim == 1.0, "the label restores brightness");
 
     app_hold(&A, t + 2000, 0, 0, 0);
-    CHECK(!app_hold(&A, t + 2100, 1, 20, 20), "finger down again");
+    CHECK(!app_hold(&A, t + 2100, 1, 32, 44), "finger down again");
     CHECK(!A.pet.sound, "not yet");
     beeps = hb_beeps;
-    CHECK(app_hold(&A, t + 2100 + APP_HOLD_MS, 1, 20, 21), "the second hold unmutes");
+    CHECK(app_hold(&A, t + 2100 + APP_HOLD_MS, 1, 33, 44), "the second hold unmutes");
     CHECK(A.pet.sound && hb_audio, "speaker is back");
     CHECK(hb_beeps == beeps + 1, "unmuting plays a note");
 

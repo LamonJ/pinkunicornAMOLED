@@ -6,7 +6,7 @@ Milestones 2 and 3 of `sprinkles-port-spec.md`, done and verified.
 
 The number under her paws runs from 0 to 100. 100 stays. When that number goes up she plays Happy Birthday, about thirteen seconds.
 
-Hold a finger still on the glass for a moment to mute. The word MUTE shows under the meters. Tap that word to turn the sound back on, or hold again.
+Hold a finger still on her for a moment to mute. The top of the glass feeds, so a hold there does not mute. The word MUTE shows under the meters. Tap that word to turn the sound back on, or hold her again.
 
 Each year lasts:
 
@@ -66,7 +66,7 @@ How full she is.
 
 ![Cake meter](docs/meters/cake.png)
 
-It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the top left of the glass, where the cake is, to feed her, including while she is sleeping: that tap wakes her and feeds her. A finger that slides a little still counts. The bar does not have to have room. A cake on a full bar costs a heart.
+It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the top of the glass to feed her, including while she is sleeping: that tap wakes her and feeds her. The cake icon sits in the corner, so the whole top counts, and a finger that slides still counts. The bar does not have to have room. A cake on a full bar costs a heart.
 
 ### Moon
 
