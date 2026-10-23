@@ -750,6 +750,73 @@ auto spr_enable_cell_charge(T &chip, long)
 template <typename T>
 void spr_enable_cell_charge(T &, ...) {}
 
+/* When charging reports done, the AXP2101 opens the battery path and runs
+ * from USB alone. Unplugging the cable then drops the board. Keep that path
+ * closed, set the charger floor on the system rail to 4.1 V so a 3.7 V cell
+ * can hold it, and ignore a one-percent fuel-gauge reading and a short dip
+ * on the regulators. Regulator voltages, the USB current limit, and the
+ * six-second power button stay as the chip already has them.
+ *
+ * Each call is optional: Library Manager copies of XPowersLib spell a few of
+ * these differently, and a missing one must not fail the build. */
+template <typename T>
+auto spr_keep_battery_path(T &chip, int)
+    -> decltype(chip.disableChargerTerminationLimit(), void())
+{
+    chip.disableChargerTerminationLimit();
+}
+template <typename T>
+void spr_keep_battery_path(T &, ...) {}
+
+template <typename T, typename Step>
+auto spr_vsys_floor(T &chip, Step step, int)
+    -> decltype(chip.setLinearChargerVsysDpm(step), void())
+{
+    chip.setLinearChargerVsysDpm(step);
+}
+template <typename T, typename Step>
+void spr_vsys_floor(T &, Step, ...) {}
+
+template <typename T>
+auto spr_vsys_off_2600(T &chip, int)
+    -> decltype(chip.setSysPowerDownVoltage((uint16_t)2600), void())
+{
+    chip.setSysPowerDownVoltage(2600);
+}
+template <typename T>
+void spr_vsys_off_2600(T &, ...) {}
+
+template <typename T>
+auto spr_gauge_shutdown_off(T &chip, int)
+    -> decltype(chip.setLowBatShutdownThreshold((uint8_t)0), void())
+{
+    chip.setLowBatShutdownThreshold(0);
+}
+template <typename T>
+void spr_gauge_shutdown_off(T &, ...) {}
+
+template <typename T>
+auto spr_ignore_rail_dip(T &chip, int)
+    -> decltype(chip.disableDC1LowVoltageTurnOff(), void())
+{
+    chip.disableDC1LowVoltageTurnOff();
+    chip.disableDC2LowVoltageTurnOff();
+    chip.disableDC3LowVoltageTurnOff();
+    chip.disableDC4LowVoltageTurnOff();
+    chip.disableDC5LowVoltageTurnOff();
+}
+template <typename T>
+void spr_ignore_rail_dip(T &, ...) {}
+
+template <typename T>
+auto spr_watchdog_off(T &chip, int)
+    -> decltype(chip.disableWatchdog(), void())
+{
+    chip.disableWatchdog();
+}
+template <typename T>
+void spr_watchdog_off(T &, ...) {}
+
 extern "C" void board_init(void)
 {
     /* Release anything the previous deep sleep latched.
@@ -872,10 +939,17 @@ extern "C" void board_init(void)
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
         spr_enable_cell_charge(pmu, 0);
+        spr_keep_battery_path(pmu, 0);
+        spr_vsys_floor(pmu, XPOWERS_AXP2101_VSYS_VOL_4V1, 0);
+        spr_vsys_off_2600(pmu, 0);
+        spr_gauge_shutdown_off(pmu, 0);
+        spr_ignore_rail_dip(pmu, 0);
+        spr_watchdog_off(pmu, 0);
         Serial.printf("PMU OK, battery %s, %d mV, charge %s\n",
                       pmu.isBatteryConnect() ? "present" : "absent",
                       pmu.getBattVoltage(),
                       pmu.isCharging() ? "on" : "idle");
+        Serial.println("PMU: unplugging USB leaves the battery running the board");
     }
 
     /* I/O expander, for the PWR button on EXIO4. */
