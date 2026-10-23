@@ -731,6 +731,25 @@ extern "C" void board_init_quiet(int quiet)
     board_init();
 }
 
+/* reg 0x18 bit 1 turns the cell charger on. It already defaults to on.
+ * XPowersLib used to call the setter enableCharge. The current AXP2101
+ * class calls it enableCellbatteryCharge, and does not have enableCharge
+ * at all. Pick whichever one this install actually has. */
+template <typename T>
+auto spr_enable_cell_charge(T &chip, int)
+    -> decltype(chip.enableCellbatteryCharge(), void())
+{
+    chip.enableCellbatteryCharge();
+}
+template <typename T>
+auto spr_enable_cell_charge(T &chip, long)
+    -> decltype(chip.enableCharge(), void())
+{
+    chip.enableCharge();
+}
+template <typename T>
+void spr_enable_cell_charge(T &, ...) {}
+
 extern "C" void board_init(void)
 {
     /* Release anything the previous deep sleep latched.
@@ -852,7 +871,7 @@ extern "C" void board_init(void)
         pmu.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_200MA);
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
-        pmu.enableCharge();
+        spr_enable_cell_charge(pmu, 0);
         Serial.printf("PMU OK, battery %s, %d mV, charge %s\n",
                       pmu.isBatteryConnect() ? "present" : "absent",
                       pmu.getBattVoltage(),
