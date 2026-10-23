@@ -1,41 +1,36 @@
-/* AXP2101 register values that keep this board alive on the cell.
+/* AXP2101 values for this board, lined up with PrintSphere.
  *
- * The Waveshare board has no battery thermistor. With the TS pin left as a
- * temperature sensor, pulling USB switches the chip to battery and a floating
- * TS pin looks out of range, so it stops the power stage. Charge-done also
- * opens the battery path, and the power-off voltage can ship from the factory
- * as high as 3.3 V, which a 3.7 V cell hits during that handover.
+ * PrintSphere runs the same Waveshare 1.75 AMOLED from the cell by leaving
+ * the charger at its normal settings: TS pin off, 50 mA precharge, a modest
+ * constant current, termination left on, stop at 4.2 V. It does not rewrite
+ * the power chip on a timer.
  *
- * These bits are written on the bus. Library method names differ between
- * XPowersLib installs, and a skipped call leaves the old behaviour in place.
+ * Earlier Sprinkles flashes wrote other bytes, and the chip keeps them
+ * while USB power stays up across an upload. This puts those bytes back
+ * once. It does not touch the battery-path bit (0x12), the power-off timer
+ * (0x27), or the DC-DC rails. A cell already above 4.2 V stays idle.
  */
 #ifndef PMU_HOLD_H
 #define PMU_HOLD_H
 
 #include <stdint.h>
 
-static inline uint8_t pmu_hold_apply(uint8_t addr, uint8_t cur)
+/* cur is the byte in the chip right now. The result is what it should be
+ * after the one-time undo. Registers this does not name come back unchanged. */
+static inline uint8_t pmu_restore_apply(uint8_t addr, uint8_t cur)
 {
     switch (addr) {
-    case 0x12: return (uint8_t)(cur | 0x08);          /* battery switch on */
-    case 0x14: return (uint8_t)(cur & 0x8F);          /* Vsys floor 4.1 V */
-    case 0x16: return (uint8_t)((cur & 0xF8) | 0x04); /* USB input 1500 mA */
-    case 0x18: return (uint8_t)((cur & 0xFE) | 0x02); /* watchdog off, charge on */
-    case 0x1A: return (uint8_t)(cur & 0xF0);          /* gauge shutdown at 0% */
-    case 0x23: return (uint8_t)(cur & 0xE0);          /* a dip must not latch off */
-    case 0x24: return (uint8_t)(cur & 0xF8);          /* power off at 2.6 V */
-    case 0x50: return (uint8_t)((cur & 0xE0) | 0x10); /* TS is not a thermistor */
-    case 0x54: return 0xFF;                           /* charge cold limit open */
-    case 0x55: return 0x00;                           /* charge hot limit open */
-    case 0x56: return 0xFF;                           /* cold limit out of reach */
-    case 0x57: return 0x00;                           /* hot limit out of reach */
-    case 0x58: return (uint8_t)(cur & 0xFE);          /* no JEITA without a sensor */
-    case 0x61: return (uint8_t)((cur & 0xF0) | 0x02); /* precharge 50 mA */
-    case 0x62: return (uint8_t)((cur & 0xE0) | 0x08); /* constant 200 mA */
-    case 0x63: return (uint8_t)(cur & 0xEF);          /* do not open the cell */
-    case 0x64: return (uint8_t)((cur & 0xF8) | 0x03); /* stop at 4.2 V */
-    case 0x67: return (uint8_t)((cur & 0xFB) | 0x40); /* precharge timer off */
-    default:   return cur;
+    case 0x14: return (uint8_t)((cur & 0x8F) | 0x60); /* Vsys floor 4.7 V */
+    case 0x1A: return (uint8_t)((cur & 0xF0) | 0x01); /* gauge shutdown nibble */
+    case 0x23: return (uint8_t)((cur & 0xE0) | 0x1F); /* undervoltage window */
+    case 0x54: return 0x29;                           /* charge cold limit */
+    case 0x55: return 0x58;                           /* charge hot limit */
+    case 0x56: return 0x3E;                           /* cold limit */
+    case 0x57: return 0x4C;                           /* hot limit */
+    case 0x63: return (uint8_t)((cur & 0xF0) | 0x11); /* termination on, 25 mA */
+    case 0x67: return (uint8_t)(cur | 0x04);          /* precharge timer bit */
+    case 0x68: return (uint8_t)(cur | 0x01);          /* battery detection on */
+    default:   return cur;                            /* 0x12, 0x24, 0x27, ... */
     }
 }
 

@@ -10,42 +10,50 @@ static int fails, checks;
 
 static void same_twice(uint8_t addr, uint8_t cur)
 {
-    uint8_t once = pmu_hold_apply(addr, cur);
-    uint8_t twice = pmu_hold_apply(addr, once);
+    uint8_t once = pmu_restore_apply(addr, cur);
+    uint8_t twice = pmu_restore_apply(addr, once);
     CHECK(once == twice, "0x%02X not stable: %02X then %02X", addr, once, twice);
 }
 
 int main(void)
 {
-    /* A factory image with every shutdown armed and TS still a thermistor. */
-    CHECK(pmu_hold_apply(0x12, 0x00) == 0x08, "battery switch forced on");
-    CHECK(pmu_hold_apply(0x12, 0x08) == 0x08, "battery switch stays on");
+    /* Bytes an earlier flash changed, put back to what the chip had before. */
+    CHECK(pmu_restore_apply(0x14, 0x05) == 0x65, "4.1 V floor back to 4.7 V");
+    CHECK(pmu_restore_apply(0x14, 0x65) == 0x65, "4.7 V floor stays");
+    CHECK(pmu_restore_apply(0x1A, 0xA0) == 0xA1, "shutdown nibble restored");
+    CHECK(pmu_restore_apply(0x23, 0x20) == 0x3F, "undervoltage window restored");
+    CHECK(pmu_restore_apply(0x54, 0xFF) == 0x29, "charge cold limit restored");
+    CHECK(pmu_restore_apply(0x55, 0x00) == 0x58, "charge hot limit restored");
+    CHECK(pmu_restore_apply(0x56, 0xFF) == 0x3E, "cold limit restored");
+    CHECK(pmu_restore_apply(0x57, 0x00) == 0x4C, "hot limit restored");
+    CHECK(pmu_restore_apply(0x63, 0x01) == 0x11, "termination back on at 25 mA");
+    CHECK(pmu_restore_apply(0x63, 0x11) == 0x11, "termination stays on");
+    CHECK(pmu_restore_apply(0x67, 0xE2) == 0xE6, "precharge timer bit restored");
+    CHECK(pmu_restore_apply(0x68, 0x00) == 0x01, "battery detection on");
+    CHECK(pmu_restore_apply(0x68, 0x01) == 0x01, "battery detection stays on");
+
+    /* Left to the library, or not our business. */
+    CHECK(pmu_restore_apply(0x12, 0x00) == 0x00, "battery switch is not rewritten");
+    CHECK(pmu_restore_apply(0x12, 0x08) == 0x08, "battery switch left as it is");
+    CHECK(pmu_restore_apply(0x27, 0x1B) == 0x1B, "power-off timer untouched");
+    CHECK(pmu_restore_apply(0x24, 0x00) == 0x00, "power-off voltage left alone");
+    CHECK(pmu_restore_apply(0x16, 0x04) == 0x04, "input limit left alone");
+    CHECK(pmu_restore_apply(0x18, 0x0A) == 0x0A, "charge enable left alone");
+    CHECK(pmu_restore_apply(0x50, 0x10) == 0x10, "TS setting left to the library");
+    CHECK(pmu_restore_apply(0x58, 0x00) == 0x00, "JEITA left alone");
+    CHECK(pmu_restore_apply(0x61, 0x06) == 0x06, "precharge current left to the library");
+    CHECK(pmu_restore_apply(0x62, 0x08) == 0x08, "200 mA left to the library");
+    CHECK(pmu_restore_apply(0x64, 0x03) == 0x03, "4.2 V left to the library");
+    CHECK(pmu_restore_apply(0x99, 0x5A) == 0x5A, "unknown register left alone");
+
     CHECK(pmu_switch_on(0x38) == 1, "topping sample has the path on");
     CHECK(pmu_switch_on(0x28) == 0, "idle sample has the path off");
-    CHECK(pmu_hold_apply(0x24, 0x07) == 0x00, "3.3 V cutoff becomes 2.6 V");
-    CHECK(pmu_hold_apply(0x16, 0x01) == 0x04, "500 mA input becomes 1500 mA");
-    CHECK(pmu_hold_apply(0x14, 0x60) == 0x00, "4.7 V rail floor becomes 4.1 V");
-    CHECK(pmu_hold_apply(0x63, 0x15) == 0x05, "termination off, 25 mA kept");
-    CHECK(pmu_hold_apply(0x50, 0x0A) == 0x10, "TS stops being a thermistor");
-    CHECK(pmu_hold_apply(0x23, 0x3F) == 0x20, "undervoltage latch off, overvoltage stays");
-    CHECK(pmu_hold_apply(0x18, 0x0B) == 0x0A, "watchdog off, charge and gauge stay");
-    CHECK(pmu_hold_apply(0x1A, 0xA1) == 0xA0, "shutdown percent cleared, warning kept");
-    CHECK(pmu_hold_apply(0x54, 0x29) == 0xFF, "charge cold limit opened");
-    CHECK(pmu_hold_apply(0x55, 0x58) == 0x00, "charge hot limit opened");
-    CHECK(pmu_hold_apply(0x58, 0x01) == 0x00, "JEITA off");
-    CHECK(pmu_hold_apply(0x61, 0x05) == 0x02, "precharge becomes 50 mA");
-    CHECK(pmu_hold_apply(0x62, 0x1F) == 0x08, "fast charge becomes 200 mA");
-    CHECK(pmu_hold_apply(0x64, 0x00) == 0x03, "target becomes 4.2 V");
-    CHECK(pmu_hold_apply(0x67, 0xFF) == 0xFB, "precharge timer off, other bits stay");
     CHECK(pmu_detect_set(0x00, 1) == 0x01, "detection can be turned on");
     CHECK(pmu_detect_set(0x01, 0) == 0x00, "detection can be forced present");
     CHECK(pmu_charge_active(0x05) == 0, "not charging is idle");
     CHECK(pmu_charge_active(0x01) == 1, "precharge is charging");
     CHECK(pmu_charge_active(0x22) == 1, "constant current is charging");
     CHECK(pmu_charge_active(0x04) == 0, "charge done is not current");
-    CHECK(pmu_hold_apply(0x56, 0x3E) == 0xFF, "cold limit opened");
-    CHECK(pmu_hold_apply(0x57, 0x4C) == 0x00, "hot limit opened");
-    CHECK(pmu_hold_apply(0x99, 0x5A) == 0x5A, "unknown register left alone");
 
     /* 2923 mV is a real flat cell, not a missing wire. 3.3 V rails need
      * headroom, so "safe to unplug" starts at 3600 mV. */
@@ -70,7 +78,7 @@ int main(void)
           "no cell still names the wire");
 
     static const uint8_t addrs[] = {
-        0x12, 0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
+        0x12, 0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x27, 0x50,
         0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
     };
     for (unsigned i = 0; i < sizeof addrs; i++) {

@@ -24,16 +24,17 @@
 > - The touch interrupt alone still misses taps, so the 500 ms timer wake
 >   also POLLS touch, BOOT, PWR and the IMU. Belt and braces; a toy you have
 >   to fight to wake is a broken toy.
-> - **Battery** is AXP2101 at 0x34. Charging is 200 mA to 4.2 V. There is no
->   thermistor, so the TS pin must not be allowed to stop the power stage when
->   USB is unplugged. Those bits are written on the bus (see `pmu_hold.h`),
->   including a 2.6 V power-off floor and charge-done leaving the cell
->   connected. A cell under 3600 mV is seen but too empty to hold the 3.3 V
->   rails; leave USB in until the boot line passes that. A flat cell can
->   latch the charger off (safety timer or the missing thermistor); boot
->   clears that latch and prints vbus and status bytes. USB powers a fully
->   off board on. Holding PWR about 6 seconds powers it off at the chip.
->   Red wire to the + mark.
+> - **Battery** is AXP2101 at 0x34. Charging matches PrintSphere on this
+>   board: TS pin off, termination left on, 50 mA precharge, 200 mA constant
+>   (PrintSphere uses 400; this cell is in a closed case), stop at 4.2 V.
+>   Earlier sketches rewrote other registers, and the chip keeps them while
+>   USB stays plugged in across an upload. Boot puts those bytes back once
+>   (`pmu_restore_apply` in `pmu_hold.h`) and then leaves the chip alone.
+>   It does not write the battery-path bit, the 6-second power-off timer, or
+>   the DC-DC rails. A cell under 3600 mV is seen but too empty to hold the
+>   3.3 V rails; leave USB in until the `cell=` line passes that. A cell
+>   already past 4.2 V sits idle. USB powers a fully off board on. Holding
+>   PWR about 6 seconds powers it off at the chip. Red wire to the + mark.
 > - **There is no clock-driven bedtime.** She sleeps only when napped or when
 >   out of energy. An earlier 20:00-07:00 window made every button look dead
 >   for anyone who flashed after 8pm, because the next tick re-slept her.

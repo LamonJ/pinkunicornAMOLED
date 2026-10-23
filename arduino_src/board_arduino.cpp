@@ -151,30 +151,16 @@ static bool exp_write(uint8_t reg, uint8_t val)
  * missed. */
 static int64_t mono_extra = 0;
 static bool pmu_ok = false;
-static int pmu_detect_on = 1;
 static int pmu_rd(uint8_t reg);
-static void pmu_hold_battery(bool log_it);
 static int pmu_cell_mv(void);
 static int pmu_vbus_mv(void);
-static void pmu_reclose_battery(void);
-static void pmu_kick_if_idle(void);
 
 extern "C" int64_t board_now_ms(void)
 {
-    int64_t now = (int64_t)millis() + mono_extra;
-    /* The charger can set its "done" bit again later. Put the hold back
-     * a few times a minute. Doing it every second crowded the same I2C
-     * bus as the touch chip and the screen popped straight back on. */
-    static int64_t hold_at = -10000;
-    if (pmu_ok && now - hold_at >= 15000) {
-        hold_at = now;
-        pmu_hold_battery(false);
-        /* Under the 4.2 V target, an idle charger gets its enable bit
-         * pulsed so the switch closes and current can start. A cell that
-         * is already at the top is left alone. */
-        pmu_kick_if_idle();
-    }
-    return now;
+    /* Light sleep stops millis(). mono_extra is the gap the on-chip RTC
+     * covered. The power chip is not touched from here: rewriting it on a
+     * timer shared the I2C bus with the touch chip. */
+    return (int64_t)millis() + mono_extra;
 }
 
 static SensorPCF85063 rtc;
@@ -797,9 +783,6 @@ auto spr_enable_cell_charge(T &chip, long)
 template <typename T>
 void spr_enable_cell_charge(T &, ...) {}
 
-/* Write the hold registers on the bus. Library helpers for these bits are
- * spelled differently across XPowersLib versions, and a skipped call leaves
- * the chip shutting off when the cable is pulled. */
 static int pmu_rd(uint8_t reg)
 {
     Wire.beginTransmission(AXP2101_SLAVE_ADDRESS);
@@ -817,29 +800,27 @@ static bool pmu_wr(uint8_t reg, uint8_t val)
     return Wire.endTransmission() == 0;
 }
 
-static const uint8_t PMU_HOLD_ADDRS[] = {
-    0x12, 0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
-    0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
+/* Earlier flashes changed these. Put them back once. A byte that is already
+ * right is left alone, so a later boot does not reprint the list. */
+static const uint8_t PMU_RESTORE_ADDRS[] = {
+    0x14, 0x1A, 0x23, 0x54, 0x55, 0x56, 0x57, 0x63, 0x67, 0x68
 };
 
-static void pmu_hold_battery(bool log_it)
+static void pmu_restore_once(void)
 {
-    for (unsigned i = 0; i < sizeof PMU_HOLD_ADDRS; i++) {
-        uint8_t addr = PMU_HOLD_ADDRS[i];
+    for (unsigned i = 0; i < sizeof PMU_RESTORE_ADDRS; i++) {
+        uint8_t addr = PMU_RESTORE_ADDRS[i];
         int cur = pmu_rd(addr);
         if (cur < 0) {
-            if (log_it) Serial.printf("PMU 0x%02X read failed\n", addr);
+            Serial.printf("PMU 0x%02X read failed\n", addr);
             continue;
         }
-        uint8_t next = pmu_hold_apply(addr, (uint8_t)cur);
-        if (addr == 0x68)
-            next = pmu_detect_set(next, pmu_detect_on);
-        if ((uint8_t)cur != next && !pmu_wr(addr, next) && log_it)
+        uint8_t next = pmu_restore_apply(addr, (uint8_t)cur);
+        if ((uint8_t)cur == next) continue;
+        if (!pmu_wr(addr, next))
             Serial.printf("PMU 0x%02X write failed\n", addr);
-        if (log_it) {
-            int now = pmu_rd(addr);
-            Serial.printf("PMU 0x%02X %02X -> %02X\n", addr, cur, now < 0 ? 0 : now);
-        }
+        else
+            Serial.printf("PMU restore 0x%02X %02X -> %02X\n", addr, cur, next);
     }
 }
 
@@ -860,37 +841,6 @@ static int pmu_vbus_mv(void)
     int lo = pmu_rd(0x39);
     if (hi < 0 || lo < 0) return -1;
     return ((hi & 0x3F) << 8) | (lo & 0xFF);
-}
-
-/* A flat cell that sat on USB past the precharge timer is latched "not
- * charging" until that timer is turned off and back on, and until the
- * charger-enable bit does the same. The temperature IRQ can hold it too. */
-static void pmu_release_charger(void)
-{
-    int t = pmu_rd(0x67);
-    if (t >= 0) {
-        pmu_wr(0x67, (uint8_t)(t & ~0x44));
-        delay(20);
-        pmu_wr(0x67, (uint8_t)((t & ~0x04) | 0x40));
-    }
-    pmu_wr(0x48, 0xFF);
-    pmu_wr(0x49, 0xFF);
-    pmu_wr(0x4A, 0xFF);
-}
-
-static int pmu_try_charge(int detect_on)
-{
-    pmu_detect_on = detect_on;
-    pmu_hold_battery(false);
-    pmu_release_charger();
-    pmu_reclose_battery();
-    delay(400);
-    int stat1 = pmu_rd(0x01);
-    Serial.printf("PMU detect %s -> %02X %s\n",
-                  detect_on ? "on" : "forced",
-                  stat1 < 0 ? 0 : stat1,
-                  pmu_chg_name(stat1));
-    return stat1;
 }
 
 static void pmu_say_cell(void)
@@ -918,32 +868,6 @@ static void pmu_say_cell(void)
     } else {
         Serial.println("PMU unplugging USB keeps her on.");
     }
-}
-
-/* A finished charge opens the battery switch and leaves the rails on USB
- * only. Turning the charger off and straight back on leaves that "done"
- * state, so the switch is closed before the cable is pulled. */
-static void pmu_reclose_battery(void)
-{
-    int en = pmu_rd(0x18);
-    if (en < 0) return;
-    uint8_t off = (uint8_t)(en & ~0x02);
-    if (!pmu_wr(0x18, off)) return;
-    delay(30);
-    pmu_wr(0x18, (uint8_t)(off | 0x02));
-}
-
-/* 4.2 V is the charge target. Above that, asking for current would be
- * pushing a full cell. Below it, pulse the charger so the switch closes. */
-static void pmu_kick_if_idle(void)
-{
-    int st1 = pmu_rd(0x01);
-    int cell = pmu_cell_mv();
-    int vbus = pmu_vbus_mv();
-    if (pmu_charge_active(st1)) return;
-    if (cell < 0 || cell >= 4200) return;
-    if (vbus < 4000) return;
-    pmu_reclose_battery();
 }
 
 extern "C" void board_init(void)
@@ -1050,31 +974,30 @@ extern "C" void board_init(void)
     /* Audio last: it is the only one the toy can do without. */
     audio_ok = audio_begin();
 
-    /* PMIC. USB turns the board on by itself. A battery does not: the
-     * charger stays off until we ask, and with no thermistor on TS the
-     * chip refuses to charge. Waveshare's profile, at a gentler 200 mA
-     * because the cell is in a closed case. 4.2 V is a normal LiPo. */
+    /* PMIC. Same sequence PrintSphere uses on this board, which runs from
+     * the cell. 200 mA instead of their 400, because this cell is in a
+     * closed case. 4.2 V is the stop. A cell already above that stays idle.
+     * Then put back, once, the bytes earlier flashes changed. The chip
+     * keeps those across an upload while USB is plugged in. */
     if (!pmu.begin(Wire, AXP2101_SLAVE_ADDRESS, IIC_SDA, IIC_SCL)) {
         Serial.println("AXP2101 not found - no battery telemetry");
     } else {
         pmu_ok = true;
-        pmu.disableTSPinMeasure();
-        pmu.enableBattDetection();
         pmu.enableBattVoltageMeasure();
         pmu.enableVbusVoltageMeasure();
         pmu.enableSystemVoltageMeasure();
+        pmu.enableTemperatureMeasure();
+        pmu.disableTSPinMeasure();
+        pmu.disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
+        pmu.clearIrqStatus();
         pmu.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_50MA);
         pmu.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_200MA);
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
+        pmu.enableChargerTerminationLimit();
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
+        pmu.enableBattDetection();
         spr_enable_cell_charge(pmu, 0);
-        /* Library setters first. Then clear a latched "not charging" fault.
-         * If the chip still will not start, force the cell present and try
-         * once more. */
-        pmu_hold_battery(true);
-        int stat1 = pmu_try_charge(1);
-        if (!pmu_charge_active(stat1))
-            pmu_try_charge(0);
+        pmu_restore_once();
         pmu_say_cell();
     }
 
