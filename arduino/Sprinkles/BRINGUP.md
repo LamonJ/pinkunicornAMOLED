@@ -28,8 +28,10 @@
 >   thermistor, so the TS pin must not be allowed to stop the power stage when
 >   USB is unplugged. Those bits are written on the bus (see `pmu_hold.h`),
 >   including a 2.6 V power-off floor and charge-done leaving the cell
->   connected. USB powers a fully off board on. Holding PWR about 6 seconds
->   powers it off at the chip. Red wire to the + mark.
+>   connected. A cell under 3600 mV is seen but too empty to hold the 3.3 V
+>   rails; leave USB in until the boot line passes that. USB powers a fully
+>   off board on. Holding PWR about 6 seconds powers it off at the chip.
+>   Red wire to the + mark.
 > - **There is no clock-driven bedtime.** She sleeps only when napped or when
 >   out of energy. An earlier 20:00-07:00 window made every button look dead
 >   for anyone who flashed after 8pm, because the next tick re-slept her.

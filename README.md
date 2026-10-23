@@ -215,7 +215,7 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | PWR button | TCA9554 P4 at 0x20, **active high** |
 | Sleep | light sleep, wake on touch/BOOT, 2 s poll for pickup |
 | Persistence | Preferences (NVS) |
-| Battery | AXP2101 via XPowersLib. Charging on: temperature pin off, 200 mA, 4.2 V. The power chip is written directly so unplugging USB leaves her running on the battery. From fully off, USB or a short press of the upper PWR button turns it on. Holding that button about 6 seconds turns the board off. Red wire to the + mark. |
+| Battery | AXP2101 via XPowersLib. Charging on: temperature pin off, 200 mA, 4.2 V. The power chip is written directly so unplugging USB leaves her running on the battery once the cell is past 3600 mV. Below that she is connected but too empty to hold the 3.3 V rails, so leave the cable in. From fully off, USB or a short press of the upper PWR button turns it on. Holding that button about 6 seconds turns the board off. Red wire to the + mark. |
 | Grown-up screen | both buttons held 5 s, native-resolution text |
 
 The three Library Manager installs are listed under Arduino IDE.

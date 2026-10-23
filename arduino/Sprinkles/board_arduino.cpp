@@ -152,6 +152,7 @@ static bool exp_write(uint8_t reg, uint8_t val)
 static int64_t mono_extra = 0;
 static bool pmu_ok = false;
 static void pmu_hold_battery(bool log_it);
+static int pmu_cell_mv(void);
 
 extern "C" int64_t board_now_ms(void)
 {
@@ -507,11 +508,14 @@ extern "C" void board_battery(int *percent, int *mv, bool *charging, bool *prese
     if (present)  *present  = false;
     if (!pmu_ok) return;
 
-    bool have = pmu.isBatteryConnect();
+    int raw = pmu_cell_mv();
+    if (mv) *mv = raw < 0 ? 0 : raw;
+    /* The library hides the voltage when its present-bit is clear. A flat
+     * cell still shows up on the ADC, which is the reading we trust. */
+    bool have = pmu.isBatteryConnect() || raw >= PMU_CELL_PRESENT_MV;
     if (present) *present = have;
     if (!have) return;
     if (percent)  *percent  = pmu.getBatteryPercent();
-    if (mv)       *mv       = pmu.getBattVoltage();
     if (charging) *charging = pmu.isCharging();
 }
 
@@ -814,6 +818,23 @@ static int pmu_cell_mv(void)
     return ((hi & 0x3F) << 8) | (lo & 0xFF);
 }
 
+static void pmu_say_cell(void)
+{
+    int cell = pmu_cell_mv();
+    int stat1 = pmu_rd(0x01);
+    int shown = cell < 0 ? 0 : cell;
+    if (pmu_cell_level(shown) == 0) {
+        Serial.printf("PMU cell %d mV. Red wire goes on the + mark.\n", shown);
+    } else if (pmu_cell_level(shown) == 1) {
+        Serial.printf("PMU cell %d mV, %s. Connected, but too empty to run her. "
+                      "Leave USB in until this passes %d.\n",
+                      shown, pmu_chg_name(stat1), PMU_CELL_READY_MV);
+    } else {
+        Serial.printf("PMU cell %d mV, %s. Unplugging USB keeps her on.\n",
+                      shown, pmu_chg_name(stat1));
+    }
+}
+
 /* A finished charge opens the battery switch and leaves the rails on USB
  * only. Turning the charger off and straight back on leaves that "done"
  * state, so the switch is closed before the cable is pulled. */
@@ -954,13 +975,7 @@ extern "C" void board_init(void)
         pmu_hold_battery(true);
         pmu_reclose_battery();
         delay(50);
-        int cell = pmu_cell_mv();
-        if (cell >= 3000) {
-            Serial.printf("PMU cell %d mV. Unplugging USB keeps her on.\n", cell);
-        } else {
-            Serial.printf("PMU cell %d mV. Red wire goes on the + mark.\n",
-                          cell < 0 ? 0 : cell);
-        }
+        pmu_say_cell();
     }
 
     /* I/O expander, for the PWR button on EXIO4. */

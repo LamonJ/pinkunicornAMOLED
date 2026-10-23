@@ -153,6 +153,9 @@ static void draw_dev_screen(int64_t now)
 void setup()
 {
     Serial.begin(115200);
+    /* A charger is not a serial monitor. Prints must not stall the toy
+     * when nothing is reading them. */
+    Serial.setTxTimeoutMs(0);
     /* Native USB needs a moment for the host to attach, and anything printed
      * before that is simply lost. Wait, but never block forever - the device
      * has to work with nothing plugged in. */
@@ -444,15 +447,20 @@ after_input:;
     static int64_t last_beat = 0;
     frames++;
     if (now - last_beat >= 2000) {
+        int cell_mv = 0;
+        bool charging = false;
+        board_battery(NULL, &cell_mv, &charging, NULL);
         Serial.printf("[%6lus] %-12s cake=%d heart=%d energy=%d mess=%d "
-                      "asleep=%d menu=%d screen=%s %d fps\n",
+                      "asleep=%d menu=%d screen=%s %d fps cell=%dmV %s\n",
                       (unsigned long)(now / 1000),
                       PET_STAGE_NAME[app.pet.stage],
                       app.pet.hunger, app.pet.happy, app.pet.energy,
                       app.pet.mess, app.pet.asleep,
                       app_menu_visible(&app),
                       app.screen_off ? "off" : "on",
-                      frames / 2);
+                      frames / 2,
+                      cell_mv,
+                      charging ? "charging" : "idle");
         frames = 0; last_beat = now;
     }
 

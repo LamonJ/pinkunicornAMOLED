@@ -32,4 +32,33 @@ static inline uint8_t pmu_hold_apply(uint8_t addr, uint8_t cur)
     }
 }
 
+/* The board makes 3.3 V for the computer from the cell. Under about 3.6 V
+ * the rail collapses as soon as the cable is pulled, which looks like a
+ * dead battery. Under 2.0 V the pin is empty, not a flat cell. */
+#define PMU_CELL_PRESENT_MV 2000
+#define PMU_CELL_READY_MV   3600
+
+/* 0: nothing on the connector. 1: connected, too flat to run. 2: ready. */
+static inline int pmu_cell_level(int mv)
+{
+    if (mv < PMU_CELL_PRESENT_MV) return 0;
+    if (mv < PMU_CELL_READY_MV) return 1;
+    return 2;
+}
+
+/* reg 0x01 bits 2:0. Names a parent can read on the boot line. */
+static inline const char *pmu_chg_name(int stat1)
+{
+    if (stat1 < 0) return "unread";
+    switch (stat1 & 7) {
+    case 0: return "trickle";
+    case 1: return "precharge";
+    case 2: return "charging";
+    case 3: return "topping";
+    case 4: return "full";
+    case 5: return "not charging";
+    default: return "unknown";
+    }
+}
+
 #endif
