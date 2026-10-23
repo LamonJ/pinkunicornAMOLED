@@ -1,3 +1,13 @@
+/* Start as an egg, or keep the pet saved on the board.
+ *
+ *   0  keep her. This is the normal setting.
+ *   1  throw away the save and start as an egg.
+ *
+ * 1 writes the egg over the old save. Set this back to 0 before the next
+ * upload if you want to keep that egg. Left at 1, every time the board
+ * turns on she is an egg again. A nap does not count. */
+#define START_AS_EGG 0
+
 /* Sprinkles.ino — a unicorn cat for a five-year-old.
  *
  * This folder is the sketch. Open Sprinkles.ino and Upload.
@@ -41,6 +51,8 @@ static int64_t last_frame, last_tick, last_save;
 static bool    touch_was_down = false;
 static double  down_x = 0, down_y = 0, last_x = 0, last_y = 0;
 
+static void save_state(void);
+
 static void load_state(int64_t now_ms)
 {
     pet_save_t blob;
@@ -48,6 +60,12 @@ static void load_state(int64_t now_ms)
     bool have_rtc = board_rtc_get(&rtc_ms, &hour);
 
     app_init(&app, now_ms);
+
+#if START_AS_EGG
+    Serial.println("START_AS_EGG is 1 - new egg. Set it back to 0 to keep her.");
+    save_state();
+    return;
+#endif
 
     int64_t away = 0;
     if (board_load(&blob, sizeof blob) &&
@@ -230,6 +248,7 @@ void setup()
     Serial.printf ("RTC     : %s\n", board_rtc_ok()   ? "OK" : "FAILED");
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
+    Serial.printf("start   : %s\n", START_AS_EGG ? "new egg (START_AS_EGG 1)" : "keep saved pet");
     Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");

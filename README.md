@@ -158,7 +158,7 @@ Install these three from Library Manager. Search for the name in the first colum
 
 Wire, Preferences, WiFi, and the I2S speaker class come with the ESP32 board package. The ES8311 speaker driver is already in the sketch folder.
 
-Uploading does not wipe the pet stored on the board, which is why a fresh flash was still the old one. This download uses a new save, so that pet is skipped and she starts as an egg. Turning her off after that keeps the new one.
+Uploading does not wipe the pet stored on the board. At the top of `Sprinkles.ino`, `START_AS_EGG` is `0` to keep her and `1` to start a new egg. `1` writes that egg over the old save, so set it back to `0` before the next upload if you want to keep the egg. Left at `1`, every time the board turns on she is an egg again.
 
 `python3 tools/make_arduino.py` rewrites `arduino/Sprinkles/` from
 `sprinkles/` and `arduino_src/` after you edit those. The sketch folder is
