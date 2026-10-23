@@ -57,6 +57,13 @@ int main(void)
     CHECK(strcmp(pmu_chg_name(0x22), "charging") == 0, "constant-current code");
     CHECK(strcmp(pmu_chg_name(0x05), "not charging") == 0, "not-charging code");
     CHECK(strcmp(pmu_chg_name(-1), "unread") == 0, "failed status read");
+    CHECK(strcmp(pmu_when_idle(4470), "the cell is full, so the charger is idle.") == 0,
+          "a full cell idles the charger");
+    CHECK(strcmp(pmu_when_idle(3493),
+                 "charger is idle. Trust the cell= line. Leave USB in if it stays under 3600.") == 0,
+          "a low first sample is not the verdict");
+    CHECK(strcmp(pmu_when_idle(0), "red wire goes on the + mark.") == 0,
+          "no cell still names the wire");
 
     static const uint8_t addrs[] = {
         0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,

@@ -452,12 +452,12 @@ extern "C" bool board_button_pressed(int which)
         boot_last = now;
         return pressed;
     }
-    /* PWR, rising edge (it reads HIGH while held). */
-    static bool pwr_last = false;
-    bool now = board_button_down(1);
-    bool pressed = (!pwr_last && now);
-    pwr_last = now;
-    return pressed;
+    /* Do not turn EXIO4 into a press. The case covers this button, and the
+     * line rises by itself. Acting on those edges flipped nap on and off
+     * with the screen still lit. board_button_down(1) is still the level,
+     * for the grown-up screen. The six-second power-off stays in the chip. */
+    (void)which;
+    return false;
 }
 
 /* ---- IMU --------------------------------------------------------------- */
@@ -740,8 +740,10 @@ extern "C" void board_sleep_until_touched(void)
         if (board_button_down(0)) break;
 #if SLEEP_PICKUP_POLL
         if (board_picked_up()) break;                  /* lifted */
-        if (board_button_down(1)) break;               /* PWR */
 #endif
+        /* PWR is not a reason to light the screen. The case covers it, and
+         * one high sample on EXIO4 was enough to end this sleep and start
+         * the nap/wake loop again. */
         /* Timer or interrupt: a real finger is still down. One sample is
          * not enough — the panel-off edge looks like a contact. */
         if (finger_still_down()) break;
@@ -902,7 +904,7 @@ static void pmu_say_cell(void)
     if (level == 0) {
         Serial.println("PMU red wire goes on the + mark.");
     } else if (!pmu_charge_active(st1)) {
-        Serial.println("PMU the battery is connected but the charger is not running.");
+        Serial.printf("PMU %s\n", pmu_when_idle(shown));
     } else if (level == 1) {
         Serial.printf("PMU charging. Leave USB in until this passes %d.\n",
                       PMU_CELL_READY_MV);

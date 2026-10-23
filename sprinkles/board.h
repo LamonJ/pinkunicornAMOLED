@@ -94,8 +94,10 @@ bool board_touch(double *wx, double *wy);
  *
  * 0 = BOOT (lower, GPIO0)   1 = PWR (upper, via the I2C expander)
  *
- * PWR held ~6 s powers the board off at the PMIC and that is not maskable,
- * which is why the child's frequent action lives on BOOT. */
+ * The case covers PWR. On the Arduino build that pin is not a nap button:
+ * EXIO4 rises on its own and each edge was flipping her between nap and
+ * wake. A dark screen is the nap. Holding PWR ~6 s still powers the board
+ * off at the PMIC, and that timer is not something firmware can turn off. */
 bool board_button_pressed(int which);      /* edge: true once per press */
 bool board_button_down(int which);         /* level: true while held     */
 

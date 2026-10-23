@@ -232,7 +232,7 @@ void setup()
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
     Serial.println("tap the cake meter = feed | tap a pile = sweep");
-    Serial.println("BOOT tap = menu | PWR tap = nap/wake | BOOT hold = nap");
+    Serial.println("BOOT tap = menu | dark screen = nap | BOOT hold = nap");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",
                   GFX_W, GFX_W, GFX_W * GFX_SCALE, GFX_SCALE, GFX_OFFSET);
@@ -251,12 +251,14 @@ void loop()
     last_frame = now;
 
     /* ---- input ----
-     * BOOT (the LOWER button) taps to toggle the menu.
-     * PWR  (the UPPER button) taps to nap, and to wake her again.
+     * BOOT (the LOWER button) taps to toggle the menu. A hold naps her.
+     * The screen going dark is the other way she naps, which is the one
+     * that works inside the case.
      *
-     * A hold on BOOT also naps her. Redundant now that PWR works, but it
-     * costs nothing and means a child who can only find one button still
-     * has the whole toy. */
+     * PWR is not read as a tap. The case covers it, and EXIO4 was rising
+     * on its own: every edge printed "[PWR] nap / wake" and flipped her
+     * while the moon was already full. Holding that button about six
+     * seconds still powers the board off at the chip. */
     #define HOLD_MS 400
     #define DEV_HOLD_MS 3000
     static bool     btn_down = false;
@@ -370,12 +372,6 @@ void loop()
         }
     }
     btn_down = boot_down;
-
-    if (board_button_pressed(1) && !dev_fired) {
-        Serial.println("[PWR] nap / wake");
-        app_button(&app, now, 1);
-        Serial.printf("           napping=%d\n", app.pet.napping);
-    }
 after_input:;
 
     if (board_picked_up()) {

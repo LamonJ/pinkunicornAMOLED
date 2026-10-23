@@ -68,6 +68,18 @@ static inline int pmu_cell_level(int mv)
     return 2;
 }
 
+/* The charger sits still once the cell is already at the top. A first
+ * sample under 3600 mV can be the meter before it settles; the repeating
+ * cell= line is the one to trust. Under 2000 mV the connector is empty. */
+static inline const char *pmu_when_idle(int cell_mv)
+{
+    if (pmu_cell_level(cell_mv) >= 2)
+        return "the cell is full, so the charger is idle.";
+    if (pmu_cell_level(cell_mv) == 1)
+        return "charger is idle. Trust the cell= line. Leave USB in if it stays under 3600.";
+    return "red wire goes on the + mark.";
+}
+
 /* reg 0x01 bits 2:0. Names a parent can read on the boot line. */
 static inline const char *pmu_chg_name(int stat1)
 {
