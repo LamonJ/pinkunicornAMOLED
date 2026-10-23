@@ -78,15 +78,17 @@ extern const double PET_MESS_MIN[PET_MESS_MAX];
 
 /* There is deliberately NO clock-driven bedtime. She sleeps when you put her
  * to sleep, or when she runs out of energy - never because of what time it
- * is. A pet that nods off on a schedule the child can't see reads as broken,
- * and it made every button look dead for anyone who flashed after 8pm. */
+ * is. Once an empty bar puts her down she stays down until it is full, so
+ * one returning pip cannot wake her, get spent, and drop her again. A pet
+ * that nods off on a schedule the child can't see reads as broken, and it
+ * made every button look dead for anyone who flashed after 8pm. */
 
 typedef struct {
     stage_t stage;
     int     hunger, happy, energy;   /* 0..4 pips                       */
     int     mess;                    /* 0..PET_MESS_MAX                 */
     int     mess_x[PET_MESS_MAX];    /* world x of each pile            */
-    bool    asleep;                  /* napped, or out of energy        */
+    bool    asleep;                  /* napping, or resting until full  */
     bool    napping;                 /* the deliberate, visible nap     */
     bool    hatched;
 
@@ -117,11 +119,11 @@ void   pet_init(pet_t *p, int64_t now_ms);
  * is exactly the bug this pair of functions exists to prevent: the blob
  * stores DURATIONS plus the wall time it was written, never a raw monotonic
  * stamp. Round-tripped in host/test_pet.c. */
-/* 6 discards pets saved by builds 5 and earlier. An Arduino upload leaves
+/* 7 discards pets saved by builds 6 and earlier. An Arduino upload leaves
  * the NVS partition alone, so the previous blob was restoring the same pet
  * after a fresh flash. A flash of this build starts at the egg. Later boots
  * of the same build keep her. */
-#define PET_SAVE_VERSION 6
+#define PET_SAVE_VERSION 7
 
 typedef struct {
     uint32_t version;

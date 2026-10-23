@@ -204,11 +204,22 @@ void pet_tick(pet_t *p, int64_t now_ms, double rand01)
 
     double left = dt;
     while (left > 0) {
-        /* Only two ways to be asleep: you put her there, or she is exhausted -
-         * and even exhaustion yields to a manual wake for half an hour, so a
-         * button press is never a no-op. */
-        bool exhausted = p->energy == 0 && now_ms >= p->wake_until_ms;
-        p->asleep = p->napping || exhausted;
+        /* Asleep if you put her there, or she ran out of energy. An empty
+         * bar keeps her down until it is full again: waking on the first
+         * pip just spends it and puts her straight back to sleep. A manual
+         * wake still beats that for half an hour. A nap stays a nap even
+         * after the bar fills, so a long screen-off catch-up does not turn
+         * into awake drain halfway through. */
+        bool rested = p->energy >= 4;
+        bool forced_awake = now_ms < p->wake_until_ms;
+        if (p->napping)
+            p->asleep = true;
+        else if (forced_awake)
+            p->asleep = false;
+        else if (p->energy == 0 || (p->asleep && !rested))
+            p->asleep = true;
+        else
+            p->asleep = false;
 
         double step = (left > slice) ? slice : left;
         needs_step(p, step);

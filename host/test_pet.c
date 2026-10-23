@@ -272,6 +272,42 @@ static void test_awake_energy_drops(void)
     CHECK(p.asleep && !p.napping, "the next tick she is asleep from exhaustion");
 }
 
+/* An empty bar used to wake her the moment one pip came back. She spent
+ * that pip and fell asleep again. She stays down until the bar is full,
+ * then the next tick gets her up with all four pips. */
+static void test_exhaustion_rests_until_full(void)
+{
+    pet_t p; int64_t now = 0; pet_init(&p, now);
+    advance(&p, 2, &now);
+    p.energy = 0;
+    p.frac_energy = 0;
+    p.frac_regen_energy = 0;
+    p.napping = false;
+    p.asleep = false;
+    p.wake_until_ms = 0;
+
+    advance(&p, 1, &now);
+    CHECK(p.asleep && !p.napping, "empty bar puts her to sleep");
+    CHECK(p.energy == 0, "the first minute has not returned a pip, got %d",
+          p.energy);
+
+    advance(&p, 2, &now);
+    CHECK(p.asleep, "still asleep when the first pip lands");
+    CHECK(p.energy == 1, "one pip after 3 min, got %d", p.energy);
+
+    advance(&p, 8, &now);
+    CHECK(p.asleep, "stays down while the bar refills");
+    CHECK(p.energy == 3, "three pips at 11 min, got %d", p.energy);
+
+    advance(&p, 1, &now);
+    CHECK(p.asleep, "the minute that fills the bar is still sleep");
+    CHECK(p.energy == 4, "full after 12 min, got %d", p.energy);
+
+    advance(&p, 1, &now);
+    CHECK(!p.asleep, "the next tick she is up");
+    CHECK(p.energy == 4, "and she kept the full bar, got %d", p.energy);
+}
+
 /* A nap has to pay off inside a four-year-old's attention span: the first
  * pip must land while she is still watching, and empty-to-full in minutes
  * rather than hours. */
@@ -304,14 +340,15 @@ static void test_no_clock_bedtime(void)
 {
     pet_t p; int64_t now = 0; pet_init(&p, now);
     advance(&p, 2, &now);
-    /* Run a full simulated day. The only thing that may ever put her under
-     * is running out of energy - never the hour. (asleep is evaluated at the
-     * top of a tick, so allow one pip of lag behind the regen.) */
+    /* Run a full simulated day. Falling asleep only happens when the bar
+     * is empty. Staying asleep while it refills is rest, not a bedtime. */
+    bool was_asleep = false;
     for (int i = 0; i < 24 * 60; i++) {
+        was_asleep = p.asleep;
         now += MIN(1); pet_tick(&p, now, 1.0);
-        if (p.asleep && !p.napping)
-            CHECK(p.energy <= 1, "asleep at minute %d with energy %d - that "
-                  "can only be the clock", i, p.energy);
+        if (p.asleep && !p.napping && !was_asleep)
+            CHECK(p.energy == 0, "fell asleep at minute %d with energy %d",
+                  i, p.energy);
     }
 }
 
@@ -451,7 +488,10 @@ static void test_save_restore_units(void)
           "a version-4 pet from an earlier flash is refused");
     old_blob = blob; old_blob.version = 5;
     CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
-          "a version-5 pet from the previous flash is refused");
+          "a version-5 pet from an earlier flash is refused");
+    old_blob = blob; old_blob.version = 6;
+    CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
+          "a version-6 pet from the previous flash is refused");
     old_blob = blob; old_blob.pet.stage = (stage_t)99;
     CHECK(!pet_restore(&u, &old_blob, boot, later, true, NULL),
           "a garbage stage is refused");
@@ -566,6 +606,7 @@ int main(void)
         { "feed results",              test_feed_results },
         { "happy follows care",        test_happy_follows_care },
         { "awake energy drops",        test_awake_energy_drops },
+        { "rests until the bar is full", test_exhaustion_rests_until_full },
         { "nap restores energy fast",  test_sleep_restores_energy_fast },
         { "no clock-driven bedtime",   test_no_clock_bedtime },
         { "wake beats exhaustion",     test_manual_wake_beats_exhaustion },
