@@ -182,6 +182,9 @@ bool          pet_clean(pet_t *p);              /* false if nothing to sweep */
 bool          pet_cuddle(pet_t *p, int64_t now_ms); /* true if a heart landed */
 void          pet_finish_transform(pet_t *p, int64_t now_ms);
 void          pet_set_nap(pet_t *p, bool nap, int64_t now_ms);
+/* The glass came back on. Ends the nap without the half-hour override.
+ * True only when the moon is already full and she actually gets up. */
+bool          pet_screen_woke(pet_t *p);
 
 /* Egg only: every press brings hatching 6 s closer. */
 void          pet_nudge_egg(pet_t *p);

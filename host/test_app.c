@@ -270,6 +270,27 @@ static void test_dark_screen_restores_energy(void)
     CHECK(A.pet.energy == 4, "twelve dark minutes fill an empty bar, got %d",
           A.pet.energy);
 
+    /* A short dark stretch must not get her up. Waking the picture used to
+     * count as a manual wake, so one pip was spent and she fell asleep again. */
+    boot(ST_ROYAL);
+    A.pet.energy = 0;
+    A.pet.frac_regen_energy = 0;
+    A.pet.frac_energy = 0;
+    A.sleep_after_s = 30;
+    seconds(40);
+    CHECK(A.screen_off && A.pet.napping, "nodded off");
+    hb_now += 4LL * 60 * 1000;
+    int beeps = hb_beeps;
+    app_touch(&A, hb_now, 0, 0);
+    CHECK(!A.screen_off, "the picture is back");
+    CHECK(!A.pet.napping && A.pet.asleep, "she stays down until the bar is full");
+    CHECK(A.pet.wake_until_ms == 0, "the screen is not a half-hour wake");
+    CHECK(A.pet.energy >= 1 && A.pet.energy < 4, "one pip, not a full bar, got %d",
+          A.pet.energy);
+    CHECK(hb_beeps == beeps, "no wake chime while she is still resting");
+    seconds(60);
+    CHECK(A.pet.asleep, "the next minute does not stand her up");
+
     boot(ST_EGG);
     A.pet.born_ms = hb_now;
     A.pet.stage_since_ms = hb_now;

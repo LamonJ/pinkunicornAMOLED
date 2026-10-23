@@ -175,10 +175,10 @@ static void wake_screen(app_t *a, int64_t now_ms)
 
     a->screen_off = false;
     a->woke_at_ms = now_ms;
-    if (a->pet.napping)
-        pet_set_nap(&a->pet, false, now_ms);
-    play(a, AN_WAKE);
-    PLAY(SND_WAKE);
+    if (pet_screen_woke(&a->pet)) {
+        play(a, AN_WAKE);
+        PLAY(SND_WAKE);
+    }
 }
 
 static void set_nap(app_t *a, bool nap, int64_t now_ms)

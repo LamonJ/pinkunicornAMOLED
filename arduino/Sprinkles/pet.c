@@ -313,6 +313,22 @@ void pet_set_nap(pet_t *p, bool nap, int64_t now_ms)
     }
 }
 
+bool pet_screen_woke(pet_t *p)
+{
+    if (p->stage == ST_DEAD || !p->napping) return false;
+    p->napping = false;
+    p->wake_until_ms = 0;
+    /* The screen coming back is not a request to get up. Waking her here
+     * used to spend the pip she had just earned and put her straight back
+     * down. A full bar gets up. Anything less stays asleep. */
+    if (p->energy >= 4) {
+        p->asleep = false;
+        return true;
+    }
+    p->asleep = true;
+    return false;
+}
+
 void pet_snapshot(const pet_t *p, int64_t now_ms,
                   int64_t rtc_ms, bool have_rtc, pet_save_t *out)
 {

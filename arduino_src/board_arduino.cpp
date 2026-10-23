@@ -162,9 +162,10 @@ extern "C" int64_t board_now_ms(void)
 {
     int64_t now = (int64_t)millis() + mono_extra;
     /* The charger can set its "done" bit again later. Put the hold back
-     * once a second so unplugging USB still has the cell connected. */
+     * a few times a minute. Doing it every second crowded the same I2C
+     * bus as the touch chip and the screen popped straight back on. */
     static int64_t hold_at = -10000;
-    if (pmu_ok && now - hold_at >= 1000) {
+    if (pmu_ok && now - hold_at >= 15000) {
         hold_at = now;
         pmu_hold_battery(false);
     }
