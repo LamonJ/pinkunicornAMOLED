@@ -74,6 +74,20 @@ void board_save(const void *blob, uint32_t len)
     memcpy(hb_blob, blob, len > sizeof hb_blob ? sizeof hb_blob : len);
     hb_have_blob = 1;
 }
+static char hb_stamp[48];
+bool board_stamp_load(char *buf, int cap)
+{
+    if (!buf || cap < 2 || !hb_stamp[0]) return false;
+    strncpy(buf, hb_stamp, (size_t)cap - 1);
+    buf[cap - 1] = 0;
+    return true;
+}
+void board_stamp_save(const char *stamp)
+{
+    if (!stamp) stamp = "";
+    strncpy(hb_stamp, stamp, sizeof hb_stamp - 1);
+    hb_stamp[sizeof hb_stamp - 1] = 0;
+}
 void board_init_quiet(int q) { (void)q; }
 void board_deep_sleep(void) { hb_slept++; }
 bool board_woke_from_deep_sleep(void) { return false; }

@@ -1,11 +1,11 @@
 /* Start as an egg, or keep the pet saved on the board.
  *
- *   0  keep her. This is the normal setting.
- *   1  throw away the save and start as an egg.
+ *   0  keep her. No start button. This is the normal setting.
+ *   1  show a Start button before the egg. Her clock begins when that
+ *      button is pressed, so she does not hatch on the way to someone.
  *
- * 1 writes the egg over the old save. Set this back to 0 before the next
- * upload if you want to keep that egg. Left at 1, every time the board
- * turns on she is an egg again. A nap does not count. */
+ * After the button, a reboot keeps her. Uploading this sketch again
+ * shows the button again. A nap does not press it. */
 #define START_AS_EGG 0
 
 /* Sprinkles.ino — a unicorn cat for a five-year-old.
@@ -62,9 +62,17 @@ static void load_state(int64_t now_ms)
     app_init(&app, now_ms);
 
 #if START_AS_EGG
-    Serial.println("START_AS_EGG is 1 - new egg. Set it back to 0 to keep her.");
-    save_state();
-    return;
+    {
+        char saved[40];
+        char build[40];
+        snprintf(build, sizeof build, "%s %s", __DATE__, __TIME__);
+        bool have = board_stamp_load(saved, (int)sizeof saved);
+        if (app_gift_needs_start(1, have ? saved : NULL, build)) {
+            app_wait_for_start(&app);
+            Serial.println("START_AS_EGG is 1 - tap START. The egg has not begun.");
+            return;
+        }
+    }
 #endif
 
     int64_t away = 0;
@@ -226,7 +234,8 @@ void setup()
     last_frame = last_tick = last_save = now;
 
     if (!woke) {
-        snprintf(buf, sizeof buf, "%s", PET_STAGE_NAME[app.pet.stage]);
+        snprintf(buf, sizeof buf, "%s",
+                 app.awaiting_start ? "tap start" : PET_STAGE_NAME[app.pet.stage]);
         board_diag(buf);
         board_diag("starting...");
     }
@@ -248,7 +257,10 @@ void setup()
     Serial.printf ("RTC     : %s\n", board_rtc_ok()   ? "OK" : "FAILED");
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
-    Serial.printf("start   : %s\n", START_AS_EGG ? "new egg (START_AS_EGG 1)" : "keep saved pet");
+    Serial.printf("start   : %s\n",
+                  app.awaiting_start ? "START button, egg has not begun" :
+                  START_AS_EGG ? "egg already begun on this upload" :
+                                 "keep saved pet");
     Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");
@@ -417,13 +429,23 @@ after_input:;
                       board_touch_raw_x, board_touch_raw_y, down_x, down_y,
                       fabs(last_x - down_x), fabs(last_y - down_y));
         int pending = app.act_pending;
+        bool waited = app.awaiting_start;
         stage_t before = app.pet.stage;
         app_touch(&app, now, down_x, down_y);
+        if (waited && !app.awaiting_start) {
+            char build[40];
+            snprintf(build, sizeof build, "%s %s", __DATE__, __TIME__);
+            board_stamp_save(build);
+            save_state();
+            last_save = now;
+            Serial.println("[start] egg begins now");
+        }
         if (app.act_pending == 1 && pending != 1) Serial.println("[tap] -> feed");
         if (app.act_pending == 2 && pending != 2) Serial.println("[tap] -> sweep");
         /* Save straight away after anything a child would notice losing. */
-        if (app.pet.stage != before || app.anim == AN_EAT || app.evo_queued ||
-            pending != app.act_pending) {
+        if (!app.awaiting_start &&
+            (app.pet.stage != before || app.anim == AN_EAT || app.evo_queued ||
+             pending != app.act_pending)) {
             save_state();
             last_save = now;
         }
@@ -450,14 +472,20 @@ after_input:;
     {
         static int persisted_stage = -1;
         if ((int)app.pet.stage != persisted_stage) {
-            if (persisted_stage >= 0) { save_state(); last_save = now; }
+            if (persisted_stage >= 0 && !app.awaiting_start) {
+                save_state();
+                last_save = now;
+            }
             persisted_stage = (int)app.pet.stage;
         }
     }
 
     /* Flash has limited write cycles, and a pet that loses thirty seconds of
      * ageing loses nothing anyone can perceive. */
-    if (now - last_save >= 30000) { save_state(); last_save = now; }
+    if (!app.awaiting_start && now - last_save >= 30000) {
+        save_state();
+        last_save = now;
+    }
 
     /* A heartbeat, so "is it alive" is never a guess. Also the fastest way
      * to see that ticks are landing and the frame rate is sane. */
@@ -493,7 +521,7 @@ after_input:;
     /* Nothing to animate with the panel off, so let the silicon idle until
      * she's touched or lifted. */
     if (app.screen_off) {
-        save_state();
+        if (!app.awaiting_start) save_state();
 #if USE_DEEP_SLEEP
         board_deep_sleep();          /* never returns; wakes as a fresh boot */
 #else

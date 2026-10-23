@@ -12,6 +12,7 @@
  * on a PC, so a misbehaviour after this compiles is in here.
  */
 #include <Arduino.h>
+#include <string.h>
 #include <Wire.h>
 #include <Preferences.h>
 #include <driver/gpio.h>
@@ -587,6 +588,27 @@ extern "C" void board_save(const void *blob, uint32_t len)
 {
     if (!prefs.begin("sprinkles", false)) return;
     prefs.putBytes("state", blob, len);
+    prefs.end();
+}
+
+extern "C" bool board_stamp_load(char *buf, int cap)
+{
+    if (!buf || cap < 2) return false;
+    memset(buf, 0, (size_t)cap);
+    if (!prefs.begin("sprinkles", true)) return false;
+    size_t got = prefs.getBytes("stamp", buf, (size_t)cap);
+    prefs.end();
+    buf[cap - 1] = '\0';
+    return got > 1 && buf[0] != '\0';
+}
+
+extern "C" void board_stamp_save(const char *stamp)
+{
+    if (!prefs.begin("sprinkles", false)) return;
+    if (!stamp) stamp = "";
+    size_t n = 0;
+    while (stamp[n] && n < 63) n++;
+    prefs.putBytes("stamp", stamp, n + 1);
     prefs.end();
 }
 

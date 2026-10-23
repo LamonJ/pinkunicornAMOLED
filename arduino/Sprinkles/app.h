@@ -59,6 +59,10 @@ typedef struct {
     int     nap_sleep_after_s;
     bool    dev_menu;            /* grown-up diagnostics, both buttons 5 s  */
 
+    /* START_AS_EGG 1, and this upload has not had its button pressed.
+     * The egg is not on screen and her clock is not running. */
+    bool    awaiting_start;
+
     int64_t last_pet_tick_ms;
 
     /* Displayed age the last time a birthday tune was considered.
@@ -76,6 +80,13 @@ typedef struct {
 } app_t;
 
 void app_init(app_t *a, int64_t now_ms);
+
+/* 1 when this upload should wait on the Start button.
+ * saved_stamp is NULL or empty until the button is pressed. build_stamp
+ * is this compile. A later reboot of the same upload matches, so she stays. */
+int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
+                         const char *build_stamp);
+void app_wait_for_start(app_t *a);
 
 /* Call about once a second. Advances needs and rolls for spontaneous
  * behaviour. */

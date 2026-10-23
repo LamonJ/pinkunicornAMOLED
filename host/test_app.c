@@ -710,6 +710,68 @@ static void test_frame_all_states(void)
     }
 }
 
+/* START_AS_EGG waits on a button. Time passing must not hatch her, and
+ * the clock starts at the press, not at boot. */
+static void test_start_button_holds_the_egg(void)
+{
+    CHECK(!app_gift_needs_start(0, NULL, "build"), "0 never waits");
+    CHECK(!app_gift_needs_start(0, "old", "new"), "0 keeps her across uploads");
+    CHECK(app_gift_needs_start(1, NULL, "build"), "1 with no stamp waits");
+    CHECK(app_gift_needs_start(1, "", "build"), "an empty stamp waits");
+    CHECK(app_gift_needs_start(1, "Oct 1 2026 00:00:00", "Oct 2 2026 00:00:00"),
+          "a new upload waits again");
+    CHECK(!app_gift_needs_start(1, "same", "same"), "the same upload keeps her");
+
+    boot(ST_EGG);
+    A.pet.born_ms = hb_now;
+    A.pet.stage_since_ms = hb_now;
+    A.pet.last_tick_ms = hb_now;
+    app_wait_for_start(&A);
+    int64_t born = A.pet.born_ms;
+    int beeps = hb_beeps;
+
+    app_frame(&A, 0, hb_now);
+    CHECK(gfx_fb[29 * GFX_W + 22] == C_DARK, "START is drawn");
+    CHECK(gfx_dim == 1.0, "the button restores brightness");
+
+    app_touch(&A, hb_now, 4, 60);
+    CHECK(A.awaiting_start, "a miss does not begin the egg");
+    CHECK(A.pet.stage == ST_EGG, "still an egg");
+    CHECK(hb_beeps == beeps, "a miss is silent");
+
+    app_button(&A, hb_now, 0);
+    CHECK(A.awaiting_start, "a side button is not Start");
+    CHECK(A.anim != AN_NUDGE, "and it does not knock the egg");
+    CHECK(A.pet.born_ms == born, "her clock did not move");
+
+    seconds(90);
+    CHECK(A.awaiting_start, "waiting out the hatch time");
+    CHECK(A.pet.stage == ST_EGG, "she did not hatch in the box, got %s",
+          PET_STAGE_NAME[A.pet.stage]);
+    CHECK(A.pet.born_ms == born, "born time stays at boot until the button");
+
+    A.sleep_after_s = 30;
+    A.idle_last_ms = hb_now;
+    seconds(40);
+    CHECK(A.screen_off, "the glass can sleep while she waits");
+    CHECK(A.pet.stage == ST_EGG, "sleeping did not hatch her");
+    app_touch(&A, hb_now, 32, 32);
+    CHECK(A.awaiting_start, "the tap that lights the glass is not Start");
+    CHECK(!A.screen_off, "the picture is back");
+
+    app_touch(&A, hb_now, 32, 32);
+    CHECK(!A.awaiting_start, "the button begins her");
+    CHECK(A.pet.stage == ST_EGG, "and she is an egg");
+    CHECK(A.pet.born_ms == hb_now, "the clock starts at the press");
+    CHECK(hb_beeps == beeps + 1, "the press has a chime");
+
+    seconds(44);
+    CHECK(A.pet.stage == ST_EGG, "44 seconds is still the egg");
+    seconds(2);
+    CHECK(A.pet.stage == ST_BLOB, "she hatches from the press, not from boot, got %s",
+          PET_STAGE_NAME[A.pet.stage]);
+}
+
 int main(void)
 {
     struct { const char *name; void (*fn)(void); } tests[] = {
@@ -727,6 +789,7 @@ int main(void)
         { "waking tap is swallowed",      test_first_tap_after_wake_is_swallowed },
         { "sleeping tap wakes and acts",  test_sleeping_tap_wakes_and_acts },
         { "cake and bottom are generous", test_generous_cake_and_bottom },
+        { "start button holds the egg",   test_start_button_holds_the_egg },
         { "roll conditions",              test_roll_conditions },
         { "peek pushes roll out",         test_peek_pushes_roll_out },
         { "egg can be tapped out",        test_egg_tap },

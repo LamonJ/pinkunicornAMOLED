@@ -108,6 +108,11 @@ bool board_picked_up(void);
 bool board_load(void *blob, uint32_t len);
 void board_save(const void *blob, uint32_t len);
 
+/* A short note beside the pet: the upload whose Start button was pressed.
+ * Missing means the button is still waiting. Not part of the pet save. */
+bool board_stamp_load(char *buf, int cap);
+void board_stamp_save(const char *stamp);
+
 /* ---- power ------------------------------------------------------------ */
 /* Light sleep with wake on touch or IMU. Returns when something woke us. */
 void board_sleep_until_touched(void);

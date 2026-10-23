@@ -70,6 +70,8 @@ void spr_hud(const pet_t *p, int energy_only, double t);
 void spr_age(int value);
 /* The word MUTE, drawn under the meters while the speaker is off. */
 void spr_muted(void);
+/* The one-time Start button. Not the egg. */
+void spr_start_button(double t);
 /* Lying still, X eyes, a slow sparkle, and the new-egg button. */
 void spr_dead(double t);
 void spr_mess(const pet_t *p);

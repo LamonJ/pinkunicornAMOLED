@@ -236,6 +236,13 @@ void board_save(const void *blob, uint32_t len)
     nvs_close(h);
 }
 
+bool board_stamp_load(char *buf, int cap)
+{
+    (void)buf; (void)cap;
+    return false;
+}
+void board_stamp_save(const char *stamp) { (void)stamp; }
+
 /* ---- power ------------------------------------------------------------- */
 void board_init_quiet(int q) { (void)q; }
 void board_deep_sleep(void) { }              /* TODO(bsp) */

@@ -295,6 +295,8 @@ static const char *GLY_W[] = { "#.#", "#.#", "###", "#.#", "#.#" };
 static const char *GLY_G[] = { "###", "#..", "##.", "#.#", "###" };
 static const char *GLY_M[] = { "#.#", "###", "#.#", "#.#", "#.#" };
 static const char *GLY_U[] = { "#.#", "#.#", "#.#", "#.#", "###" };
+static const char *GLY_S[] = { "###", "#..", "###", "..#", "###" };
+static const char *GLY_R[] = { "###", "#.#", "##.", "#.#", "#.#" };
 static const char *XEYE[]  = { "#.#", ".#.", "#.#" };
 
 static void word(int x, int y, const char **const *glyphs, int n, rgb_t c)
@@ -309,6 +311,16 @@ void spr_muted(void)
 {
     const char **w[4] = { GLY_M, GLY_U, GLY_T, GLY_E };
     word(24, 18, w, 4, C_STAR);
+}
+
+void spr_start_button(double t)
+{
+    (void)t;
+    const char **w[5] = { GLY_S, GLY_T, GLY_A, GLY_R, GLY_T };
+    gfx_ellipse(32, 32, 18, 14, C_DARK);
+    gfx_ellipse(32, 31, 16, 12, C_COAT);
+    gfx_ellipse(26, 24, 4, 2, C_COATHI);
+    word(22, 29, w, 5, C_DARK);          /* START, 19 wide, centred */
 }
 
 void spr_dead(double t)

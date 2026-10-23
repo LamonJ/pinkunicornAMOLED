@@ -87,6 +87,20 @@ static const spr_note_t SND_UNMUTE[]   = { {880,140},{1320,200} };
 #define ACT_DELAY_MS     1000.0
 #define NUDGE_MS          400.0
 
+int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
+                         const char *build_stamp)
+{
+    if (!start_as_egg) return 0;
+    if (!saved_stamp || !saved_stamp[0] || !build_stamp || !build_stamp[0])
+        return 1;
+    return strcmp(saved_stamp, build_stamp) != 0;
+}
+
+void app_wait_for_start(app_t *a)
+{
+    a->awaiting_start = true;
+}
+
 void app_init(app_t *a, int64_t now_ms)
 {
     memset(a, 0, sizeof(*a));
@@ -191,6 +205,17 @@ static void set_nap(app_t *a, bool nap, int64_t now_ms)
 /* ---- once a second ---------------------------------------------------- */
 void app_tick(app_t *a, int64_t now_ms)
 {
+    /* The egg clock must not run while the Start button is up. A box on
+     * the way to someone can sit powered on, and 45 seconds would hatch
+     * her before they ever see the egg. The screen may still go dark. */
+    if (a->awaiting_start) {
+        int timeout = a->sleep_after_s;
+        if (timeout > 0 && !a->screen_off &&
+            now_ms - a->idle_last_ms > (int64_t)timeout * 1000)
+            a->screen_off = true;
+        return;
+    }
+
     /* Draw all randomness up front, exactly four values per tick regardless
      * of which branch we take. Otherwise the number of calls depends on the
      * control flow, which makes behaviour hard to reproduce — and tests
@@ -376,6 +401,14 @@ void app_frame(app_t *a, double t, int64_t now_ms)
     if (a->screen_off) {
         gfx_clear(C_VOID_OFF);
         spr_resting(t);
+        return;
+    }
+
+    if (a->awaiting_start) {
+        gfx_clear(C_VOID);
+        gfx_dim = 1.0;
+        spr_start_button(t);
+        gfx_dim = 1.0;
         return;
     }
 
@@ -574,9 +607,16 @@ static void toggle_sound(app_t *a)
     if (a->pet.sound) PLAY(SND_UNMUTE);
 }
 
+/* The Start button, centre of the glass. Wide enough for a small finger. */
+static bool on_start_button(double wx, double wy)
+{
+    return wx >= 14 && wx <= 50 && wy >= 18 && wy <= 46;
+}
+
 /* A still finger. Sliding off cancels it, and it only lands once per press. */
 bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
 {
+    if (a->awaiting_start) return false;
     if (!down) {
         a->hold_down = false;
         a->hold_fired = false;
@@ -625,6 +665,21 @@ static bool tap_care(app_t *a, int64_t now_ms, double wx, double wy)
 
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 {
+    if (a->awaiting_start) {
+        if (a->screen_off) {
+            a->screen_off = false;
+            a->idle_last_ms = now_ms;
+            a->woke_at_ms = now_ms;
+            return;
+        }
+        a->idle_last_ms = now_ms;
+        if (!on_start_button(wx, wy)) return;
+        /* Her clock starts at this press, not at boot and not at flash. */
+        app_init(a, now_ms);
+        PLAY(SND_STAGE);
+        return;
+    }
+
     if (a->screen_off) {
         wake_screen(a, now_ms);
         /* The finger that lit the glass is asking her to get up, even when
@@ -721,6 +776,14 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 
 void app_button(app_t *a, int64_t now_ms, int which)
 {
+    if (a->awaiting_start) {
+        if (a->screen_off) {
+            a->screen_off = false;
+            a->idle_last_ms = now_ms;
+            a->woke_at_ms = now_ms;
+        }
+        return;
+    }
     if (a->screen_off) { wake_screen(a, now_ms); return; }
     a->idle_last_ms = now_ms;
     if (a->evo_on) return;
@@ -748,5 +811,10 @@ void app_button(app_t *a, int64_t now_ms, int which)
 
 void app_picked_up(app_t *a, int64_t now_ms)
 {
+    if (a->awaiting_start) {
+        a->screen_off = false;
+        a->idle_last_ms = now_ms;
+        return;
+    }
     wake_screen(a, now_ms);
 }
