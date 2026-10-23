@@ -18,6 +18,8 @@ SHARED = ["gfx.h", "gfx.c", "pet.h", "pet.c",
 EXTRA  = [("arduino_src/Sprinkles.ino",     "Sprinkles.ino"),
           ("arduino_src/board_arduino.cpp", "board_arduino.cpp"),
           ("arduino_src/pmu_hold.h",        "pmu_hold.h"),
+          ("arduino_src/splash_565.c",      "splash_565.c"),
+          ("arduino_src/splash_565.h",      "splash_565.h"),
           # Espressif's ES8311 driver, Apache-2.0, verbatim from Waveshare's
           # 08_ES8311 example. Vendored so the sketch is self-contained.
           ("arduino_src/es8311.c",          "es8311.c"),

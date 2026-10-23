@@ -139,6 +139,12 @@ ESP32-S3-Touch-AMOLED-1.75, and the scene code. Open it and Upload. You do
 not copy pins in from the Waveshare examples, and you do not run a generator
 before the first flash.
 
+Turning the board on shows her picture, then the pet.
+
+![Splash](docs/splash.png)
+
+Boot details still print on the serial monitor. If the frame buffer cannot be allocated, the glass shows that in red.
+
 Board: **ESP32S3 Dev Module**. Settings that matter:
 
 | Setting | Value |

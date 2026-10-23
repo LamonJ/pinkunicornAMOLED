@@ -12,7 +12,9 @@
  * on a PC, so a misbehaviour after this compiles is in here.
  */
 #include <Arduino.h>
+#include <stdlib.h>
 #include <string.h>
+#include "splash_565.h"
 #include <Wire.h>
 #include <Preferences.h>
 #include <driver/gpio.h>
@@ -247,9 +249,8 @@ extern "C" bool board_audio_ok(void) { return audio_ok; }
 static bool audio_begin(void)
 {
     /* The codec needs its rails settled before it will accept configuration.
-     * On a cold boot it got that for free from the colour self-test; a wake
-     * from deep sleep skips the test, so the delay has to be explicit or the
-     * ES8311 configures on the second boot and simply does not play. */
+     * Without this pause the ES8311 configures on the second boot and
+     * simply does not play. */
     delay(200);
 
     /* PA is the amplifier enable. Without driving this you will hear nothing
@@ -343,24 +344,41 @@ static Arduino_CO5300  *gfx = nullptr;
 
 extern "C" bool board_display_ok(void) { return gfx != nullptr; }
 
-/* Boot diagnostics, drawn on the AMOLED as well as printed. If USB CDC is
- * off you get nothing on serial, and a halted sketch looks exactly like a
- * broken panel — this tells the two apart without a debugger. */
+/* Boot lines go to serial. The glass shows the splash picture, so a normal
+ * line must not clear it. A failure still paints, because a halted sketch
+ * with no serial link would otherwise look like a dead panel. */
 static int diag_y = 0;
-static void diag(const char *line, uint16_t colour)
+extern "C" void board_diag(const char *line)
+{
+    Serial.println(line);
+    Serial.flush();
+}
+extern "C" void board_diag_fail(const char *line)
 {
     Serial.println(line);
     Serial.flush();
     if (!gfx) return;
     if (diag_y == 0) { gfx->fillScreen(RGB565_BLACK); diag_y = 120; }
     gfx->setTextSize(2);
-    gfx->setTextColor(colour);
+    gfx->setTextColor(RGB565_RED);
     gfx->setCursor(60, diag_y);
     gfx->println(line);
     diag_y += 24;
 }
-extern "C" void board_diag(const char *line)      { diag(line, 0xFFFF); }
-extern "C" void board_diag_fail(const char *line) { diag(line, RGB565_RED); }
+
+/* Same path as her frames: a PSRAM buffer, pushed, then released. */
+static void show_splash(void)
+{
+    size_t nbytes = sizeof splash_565;
+    uint16_t *buf = (uint16_t *)ps_malloc(nbytes);
+    if (buf) {
+        memcpy(buf, splash_565, nbytes);
+        gfx->draw16bitRGBBitmap(0, 0, buf, SPLASH_W, SPLASH_H);
+        free(buf);
+    } else {
+        gfx->draw16bitRGBBitmap(0, 0, (uint16_t *)splash_565, SPLASH_W, SPLASH_H);
+    }
+}
 
 extern "C" void board_panel_push(const uint16_t *fb565)
 {
@@ -924,18 +942,16 @@ extern "C" void board_init(void)
         Serial.println("gfx->begin() FAILED - check pin_config.h wiring");
         delete gfx; gfx = nullptr;
     } else {
-        /* Flash the primaries on a cold boot. If you see red, green, blue go
-         * past, the panel, the QSPI bus and the pin config are all good -
-         * regardless of whether serial is working. Skipped when waking from
-         * deep sleep, which happens every time she is roused. */
+        /* Her picture, at the same brightness the pet uses. Status lines stay
+         * on serial so they do not cover it. Skipped when waking from deep
+         * sleep, which would otherwise play a title card every time she is
+         * roused. */
         gfx->displayOn();
-        gfx->setBrightness(160);
-        if (!init_quiet) {
-            gfx->fillScreen(RGB565_RED);   delay(250);
-            gfx->fillScreen(RGB565_GREEN); delay(250);
-            gfx->fillScreen(RGB565_BLUE);  delay(250);
-        }
-        gfx->fillScreen(RGB565_BLACK);
+        gfx->setBrightness((uint8_t)(35 * 255 / 100));
+        if (!init_quiet)
+            show_splash();
+        else
+            gfx->fillScreen(RGB565_BLACK);
     }
 
     /* Touch, exactly as their 10_Touch_CST9217 example does it. */

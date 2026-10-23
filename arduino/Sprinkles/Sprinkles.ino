@@ -196,7 +196,7 @@ void setup()
     Serial.println();
     Serial.println(woke ? "=== Sprinkles waking ===" : "=== Sprinkles booting ===");
 
-    board_init_quiet(woke);     /* skips the colour self-test when waking */
+    board_init_quiet(woke);     /* skips the splash picture when waking */
 
     if (!board_display_ok())
         Serial.println("DISPLAY FAILED - check pin_config.h");
@@ -270,7 +270,7 @@ void setup()
         /* She notices you, exactly as she would have on a light-sleep wake. */
         app_picked_up(&app, now);
     } else {
-        delay(1500);            /* long enough to read the panel */
+        delay(1500);            /* long enough to see the splash */
     }
 }
 

@@ -19,11 +19,11 @@ extern "C" {
 
 /* ---- lifecycle -------------------------------------------------------- */
 void board_init(void);
-void board_init_quiet(int quiet);   /* skips the boot self-test */
+void board_init_quiet(int quiet);   /* skips the splash picture */
 
-/* Diagnostics that go to BOTH the serial port and the panel itself, because
- * on this board a dead serial link and a dead display look identical from
- * the outside. Use during boot only; the frame loop overwrites the screen. */
+/* Boot lines. Serial always. Only a failure is drawn on the glass, because
+ * a normal boot shows the splash picture. Use during boot only; the frame
+ * loop overwrites the screen. */
 void board_diag(const char *line);
 void board_diag_fail(const char *line);
 bool board_display_ok(void);
