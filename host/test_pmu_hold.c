@@ -18,6 +18,10 @@ static void same_twice(uint8_t addr, uint8_t cur)
 int main(void)
 {
     /* A factory image with every shutdown armed and TS still a thermistor. */
+    CHECK(pmu_hold_apply(0x12, 0x00) == 0x08, "battery switch forced on");
+    CHECK(pmu_hold_apply(0x12, 0x08) == 0x08, "battery switch stays on");
+    CHECK(pmu_switch_on(0x38) == 1, "topping sample has the path on");
+    CHECK(pmu_switch_on(0x28) == 0, "idle sample has the path off");
     CHECK(pmu_hold_apply(0x24, 0x07) == 0x00, "3.3 V cutoff becomes 2.6 V");
     CHECK(pmu_hold_apply(0x16, 0x01) == 0x04, "500 mA input becomes 1500 mA");
     CHECK(pmu_hold_apply(0x14, 0x60) == 0x00, "4.7 V rail floor becomes 4.1 V");
@@ -66,7 +70,7 @@ int main(void)
           "no cell still names the wire");
 
     static const uint8_t addrs[] = {
-        0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
+        0x12, 0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
         0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
     };
     for (unsigned i = 0; i < sizeof addrs; i++) {

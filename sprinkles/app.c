@@ -407,10 +407,11 @@ void app_frame(app_t *a, double t, int64_t now_ms)
 
     bool menu = app_menu_visible(a);
 
+    /* The cake and the piles stay on the glass while she sleeps. Hiding
+     * them made a tap on the cake do nothing a child could see. */
     gfx_dim = 1.0;
-    spr_hud(&a->pet, nap, t);
-
-    gfx_dim = nap ? 0.42 : (menu ? 0.32 : 1.0);
+    spr_hud(&a->pet, 0, t);
+    gfx_dim = menu ? 0.32 : 1.0;
     spr_mess(&a->pet);
 
     cat_geom_t g;
@@ -535,14 +536,14 @@ static void queue_action(app_t *a, int64_t now_ms, int which)
     PLAY(SND_PRESS);
 }
 
-/* A pile is drawn around (mess_x, 53). The hit is a little bigger than
- * the sprite so a small finger still lands on it. */
+/* A pile is drawn around (mess_x, 53). The box is a finger wider than the
+ * sprite, and it stops short of her paws so a pet does not sweep. */
 static bool on_mess(const app_t *a, double wx, double wy)
 {
     for (int i = 0; i < a->pet.mess; i++) {
         double dx = wx - a->pet.mess_x[i];
-        double dy = wy - 50.0;
-        if (dx * dx + dy * dy < 100.0) return true;
+        double dy = wy - 53.0;
+        if (dx * dx <= 144.0 && dy * dy <= 144.0) return true;
     }
     return false;
 }
@@ -550,7 +551,20 @@ static bool on_mess(const app_t *a, double wx, double wy)
 /* Hunger cake and its pips, top of the screen. */
 static bool on_cake_meter(double wx, double wy)
 {
-    return wx >= 8 && wx <= 34 && wy >= 6 && wy <= 16;
+    return wx >= 4 && wx <= 36 && wy >= 4 && wy <= 16;
+}
+
+/* The word MUTE, under the meters. Only drawn while the speaker is off. */
+static bool on_mute_word(double wx, double wy)
+{
+    return wx >= 22 && wx <= 42 && wy >= 17 && wy <= 24;
+}
+
+static void toggle_sound(app_t *a)
+{
+    a->pet.sound = !a->pet.sound;
+    board_audio_enable(a->pet.sound);
+    if (a->pet.sound) PLAY(SND_UNMUTE);
 }
 
 /* A still finger. Sliding off cancels it, and it only lands once per press. */
@@ -578,17 +592,42 @@ bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
     if (now_ms - a->hold_at < APP_HOLD_MS) return false;
 
     a->hold_fired = true;
-    a->pet.sound = !a->pet.sound;
-    board_audio_enable(a->pet.sound);
-    if (a->pet.sound) PLAY(SND_UNMUTE);
+    toggle_sound(a);
     return true;
+}
+
+/* Cake, a pile, or the word MUTE. Shared by a waking tap and a normal one
+ * so the press that gets her up can also feed, sweep, or unmute. */
+static bool tap_care(app_t *a, int64_t now_ms, double wx, double wy)
+{
+    if (a->pet.stage == ST_EGG || a->pet.stage == ST_DEAD) return false;
+    if (!a->pet.sound && on_mute_word(wx, wy)) {
+        toggle_sound(a);
+        return true;
+    }
+    if (on_mess(a, wx, wy)) { queue_action(a, now_ms, 2); return true; }
+    if (on_cake_meter(wx, wy)) { queue_action(a, now_ms, 1); return true; }
+    return false;
 }
 
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
 {
-    if (a->screen_off) { wake_screen(a, now_ms); return; }
+    if (a->screen_off) {
+        wake_screen(a, now_ms);
+        /* The finger that lit the glass is asking her to get up, even when
+         * the moon is still low. Leaving her asleep here swallowed every
+         * later tap, so feed, sweep, and unmute all looked broken. */
+        if (a->pet.asleep && a->pet.stage != ST_EGG && a->pet.stage != ST_DEAD)
+            set_nap(a, false, now_ms);
+        return;
+    }
     a->idle_last_ms = now_ms;
-    if (now_ms - a->woke_at_ms < 400) return;      /* that tap was the wake-up */
+    /* The finger that lit the screen must not also pet her. It can still
+     * land on the cake, a pile, or MUTE. */
+    if (now_ms - a->woke_at_ms < 400) {
+        tap_care(a, now_ms, wx, wy);
+        return;
+    }
     if (app_busy(a)) return;
 
     if (a->pet.stage == ST_DEAD) {
@@ -617,14 +656,18 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
         }
     }
 
-    if (a->pet.napping) { set_nap(a, false, now_ms); return; }
-    if (a->pet.asleep) return;
+    /* Asleep or napping: this tap gets her up and keeps her up, and if it
+     * landed on the cake, a pile, or MUTE it does that too. */
+    if (a->pet.napping || a->pet.asleep) {
+        set_nap(a, false, now_ms);
+        tap_care(a, now_ms, wx, wy);
+        return;
+    }
 
     /* The side buttons sit on the metal edge and a case can hide them.
      * The cake meter and the piles are the same two actions, on things
      * that are already on the glass. */
-    if (on_mess(a, wx, wy)) { queue_action(a, now_ms, 2); return; }
-    if (on_cake_meter(wx, wy)) { queue_action(a, now_ms, 1); return; }
+    if (tap_care(a, now_ms, wx, wy)) return;
 
     /* Petting her: she always reacts, the heart is rate-limited.
      *
@@ -677,9 +720,9 @@ void app_button(app_t *a, int64_t now_ms, int which)
     /* Dead: the only restart is the on-screen hatch button. */
     if (a->pet.stage == ST_DEAD) return;
 
-    /* Either button wakes her from a nap — a child mashing both should get
-     * the obvious result. */
-    if (a->pet.napping) { set_nap(a, false, now_ms); return; }
+    /* Either button gets her up. A nap and a low-moon rest are the same
+     * from the glass: she was down, and a press means get up. */
+    if (a->pet.napping || a->pet.asleep) { set_nap(a, false, now_ms); return; }
 
     if (which == 0) {
         a->menu = !a->menu;

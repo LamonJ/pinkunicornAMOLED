@@ -17,6 +17,7 @@
 static inline uint8_t pmu_hold_apply(uint8_t addr, uint8_t cur)
 {
     switch (addr) {
+    case 0x12: return (uint8_t)(cur | 0x08);          /* battery switch on */
     case 0x14: return (uint8_t)(cur & 0x8F);          /* Vsys floor 4.1 V */
     case 0x16: return (uint8_t)((cur & 0xF8) | 0x04); /* USB input 1500 mA */
     case 0x18: return (uint8_t)((cur & 0xFE) | 0x02); /* watchdog off, charge on */
@@ -66,6 +67,13 @@ static inline int pmu_cell_level(int mv)
     if (mv < PMU_CELL_PRESENT_MV) return 0;
     if (mv < PMU_CELL_READY_MV) return 1;
     return 2;
+}
+
+/* reg 0x00 bit 4. On this board the bit was set during a topping charge
+ * and clear while the charger sat idle, so 1 means the path is conducting. */
+static inline int pmu_switch_on(int stat0)
+{
+    return stat0 >= 0 && (stat0 & 0x10) != 0;
 }
 
 /* The charger sits still once the cell is already at the top. A first

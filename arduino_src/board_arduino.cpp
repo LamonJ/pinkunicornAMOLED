@@ -157,6 +157,7 @@ static void pmu_hold_battery(bool log_it);
 static int pmu_cell_mv(void);
 static int pmu_vbus_mv(void);
 static void pmu_reclose_battery(void);
+static void pmu_kick_if_idle(void);
 
 extern "C" int64_t board_now_ms(void)
 {
@@ -168,6 +169,10 @@ extern "C" int64_t board_now_ms(void)
     if (pmu_ok && now - hold_at >= 15000) {
         hold_at = now;
         pmu_hold_battery(false);
+        /* Under the 4.2 V target, an idle charger gets its enable bit
+         * pulsed so the switch closes and current can start. A cell that
+         * is already at the top is left alone. */
+        pmu_kick_if_idle();
     }
     return now;
 }
@@ -536,10 +541,11 @@ extern "C" void board_batt_info(char *buf, int len)
     int vbus = pmu_vbus_mv();
     int st0 = pmu_rd(0x00);
     int st1 = pmu_rd(0x01);
-    snprintf(buf, (size_t)len, "cell=%dmV vbus=%dmV %s st=%02X/%02X",
+    snprintf(buf, (size_t)len, "cell=%dmV vbus=%dmV %s sw=%s st=%02X/%02X",
              cell < 0 ? 0 : cell,
              vbus < 0 ? 0 : vbus,
              pmu_chg_name(st1),
+             pmu_switch_on(st0) ? "on" : "off",
              st0 < 0 ? 0 : st0,
              st1 < 0 ? 0 : st1);
 }
@@ -812,7 +818,7 @@ static bool pmu_wr(uint8_t reg, uint8_t val)
 }
 
 static const uint8_t PMU_HOLD_ADDRS[] = {
-    0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
+    0x12, 0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
     0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
 };
 
@@ -895,12 +901,13 @@ static void pmu_say_cell(void)
     int st1 = pmu_rd(0x01);
     int shown = cell < 0 ? 0 : cell;
     int level = pmu_cell_level(shown);
-    Serial.printf("PMU cell %d mV, vbus %d mV, status %02X %02X, %s.\n",
+    Serial.printf("PMU cell %d mV, vbus %d mV, status %02X %02X, %s, switch %s.\n",
                   shown,
                   vbus < 0 ? 0 : vbus,
                   st0 < 0 ? 0 : st0,
                   st1 < 0 ? 0 : st1,
-                  pmu_chg_name(st1));
+                  pmu_chg_name(st1),
+                  pmu_switch_on(st0) ? "on" : "off");
     if (level == 0) {
         Serial.println("PMU red wire goes on the + mark.");
     } else if (!pmu_charge_active(st1)) {
@@ -924,6 +931,19 @@ static void pmu_reclose_battery(void)
     if (!pmu_wr(0x18, off)) return;
     delay(30);
     pmu_wr(0x18, (uint8_t)(off | 0x02));
+}
+
+/* 4.2 V is the charge target. Above that, asking for current would be
+ * pushing a full cell. Below it, pulse the charger so the switch closes. */
+static void pmu_kick_if_idle(void)
+{
+    int st1 = pmu_rd(0x01);
+    int cell = pmu_cell_mv();
+    int vbus = pmu_vbus_mv();
+    if (pmu_charge_active(st1)) return;
+    if (cell < 0 || cell >= 4200) return;
+    if (vbus < 4000) return;
+    pmu_reclose_battery();
 }
 
 extern "C" void board_init(void)

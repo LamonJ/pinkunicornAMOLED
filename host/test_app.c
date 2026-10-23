@@ -270,8 +270,9 @@ static void test_dark_screen_restores_energy(void)
     CHECK(A.pet.energy == 4, "twelve dark minutes fill an empty bar, got %d",
           A.pet.energy);
 
-    /* A short dark stretch must not get her up. Waking the picture used to
-     * count as a manual wake, so one pip was spent and she fell asleep again. */
+    /* A tap on the dark glass gets her up even when the moon is still low.
+     * The screen used to come back and leave her asleep, and every tap
+     * after that was thrown away. */
     boot(ST_ROYAL);
     A.pet.energy = 0;
     A.pet.frac_regen_energy = 0;
@@ -283,13 +284,15 @@ static void test_dark_screen_restores_energy(void)
     int beeps = hb_beeps;
     app_touch(&A, hb_now, 0, 0);
     CHECK(!A.screen_off, "the picture is back");
-    CHECK(!A.pet.napping && A.pet.asleep, "she stays down until the bar is full");
-    CHECK(A.pet.wake_until_ms == 0, "the screen is not a half-hour wake");
+    CHECK(hb_beeps > beeps, "she chimes when the tap gets her up");
+    CHECK(!A.pet.napping && !A.pet.asleep, "a tap gets her up");
+    CHECK(A.pet.wake_until_ms == hb_now + PET_WAKE_OVERRIDE_MS,
+          "the tap keeps her up for half an hour");
     CHECK(A.pet.energy >= 1 && A.pet.energy < 4, "one pip, not a full bar, got %d",
           A.pet.energy);
-    CHECK(hb_beeps == beeps, "no wake chime while she is still resting");
+    A.sleep_after_s = 0;             /* the next minute is the energy rule */
     seconds(60);
-    CHECK(A.pet.asleep, "the next minute does not stand her up");
+    CHECK(!A.pet.asleep, "she stays up after the tap");
 
     boot(ST_EGG);
     A.pet.born_ms = hb_now;
@@ -476,6 +479,47 @@ static void test_birthday_tune(void)
     CHECK(hb_beeps == before, "a dead pet does not get a birthday tune");
 }
 
+static void test_sleeping_tap_wakes_and_acts(void)
+{
+    boot(ST_ROYAL);
+    A.pet.napping = true;
+    A.pet.asleep = true;
+    A.pet.energy = 1;
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 18, 11);
+    CHECK(!A.pet.asleep && !A.pet.napping, "a cake tap wakes her");
+    CHECK(A.pet.wake_until_ms == hb_now + PET_WAKE_OVERRIDE_MS, "and she stays up");
+    CHECK(A.act_pending == 1, "and that tap still feeds");
+    frames(1100);
+    CHECK(A.pet.hunger == 3, "the cake landed, got %d", A.pet.hunger);
+
+    boot(ST_ROYAL);
+    A.pet.asleep = true;
+    A.pet.energy = 0;
+    A.pet.mess = 1;
+    A.pet.mess_x[0] = 13;
+    app_touch(&A, hb_now, 13, 61);
+    CHECK(!A.pet.asleep, "a low tap on the pile wakes her");
+    CHECK(A.act_pending == 2, "and queues the sweep");
+    frames(1100);
+    CHECK(A.pet.mess == 0, "the pile is gone");
+
+    boot(ST_ROYAL);
+    A.pet.asleep = true;
+    A.pet.sound = false;
+    app_touch(&A, hb_now, 30, 20);
+    CHECK(A.pet.sound, "tapping MUTE turns the sound on");
+    CHECK(hb_audio, "and the speaker follows");
+    CHECK(!A.pet.asleep, "and she is awake");
+
+    boot(ST_ROYAL);
+    A.pet.asleep = true;
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 32, (int)PET_CY);
+    CHECK(!A.pet.asleep, "a tap on her wakes her");
+    CHECK(A.act_pending == 0, "and does not feed");
+}
+
 /* A still hold mutes. Another hold brings the sound back. The word MUTE
  * is on screen the whole time it is quiet, and a new egg keeps the choice. */
 static void test_hold_mutes(void)
@@ -621,6 +665,7 @@ int main(void)
         { "screen sleep and wake",        test_screen_sleep_and_wake },
         { "dark screen restores energy",  test_dark_screen_restores_energy },
         { "waking tap is swallowed",      test_first_tap_after_wake_is_swallowed },
+        { "sleeping tap wakes and acts",  test_sleeping_tap_wakes_and_acts },
         { "roll conditions",              test_roll_conditions },
         { "peek pushes roll out",         test_peek_pushes_roll_out },
         { "egg can be tapped out",        test_egg_tap },

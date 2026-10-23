@@ -6,7 +6,7 @@ Milestones 2 and 3 of `sprinkles-port-spec.md`, done and verified.
 
 The number under her paws runs from 0 to 100. 100 stays. When that number goes up she plays Happy Birthday, about thirteen seconds.
 
-Hold a finger still on the glass for a moment to mute. The word MUTE shows under the meters until you hold again.
+Hold a finger still on the glass for a moment to mute. The word MUTE shows under the meters. Tap that word to turn the sound back on, or hold again.
 
 Each year lasts:
 
@@ -66,7 +66,7 @@ How full she is.
 
 ![Cake meter](docs/meters/cake.png)
 
-It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake meter to feed her. The bar does not have to have room. A cake on a full bar costs a heart.
+It empties on its own. The first pip takes about 5 minutes, then the rest slow down, and an empty bar takes about 6 hours. Tap the cake meter to feed her, including while she is sleeping: that tap wakes her and feeds her. The bar does not have to have room. A cake on a full bar costs a heart.
 
 ### Moon
 
@@ -74,7 +74,7 @@ Energy.
 
 ![Moon meter](docs/meters/moon.png)
 
-It falls while she is awake, about one pip every 8 minutes. A full bar lasts about half an hour. At empty she falls asleep and stays asleep until the bar is full again, about 12 minutes, then she gets up. When the screen goes dark she goes to sleep, and the bar fills, about one pip every 3 minutes, until you tap the glass.
+It falls while she is awake, about one pip every 8 minutes. A full bar lasts about half an hour. At empty she falls asleep. Left alone, she stays down until the bar is full again, about 12 minutes, then she gets up. A tap gets her up right away, and she stays up so you can feed her and sweep. When the screen goes dark she goes to sleep, and the bar fills, about one pip every 3 minutes. Tap a pile to sweep it, awake or asleep.
 
 ## When she dies
 
@@ -215,7 +215,7 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | PWR button | The case covers it, so it is not a nap button. EXIO4 was chattering and flipping her between nap and wake. A dark screen is the nap. Holding the button about 6 seconds still powers the board off. |
 | Sleep | light sleep, wake on touch/BOOT, 2 s poll for pickup |
 | Persistence | Preferences (NVS) |
-| Battery | AXP2101 via XPowersLib. Charging on: temperature pin off, 200 mA, 4.2 V. The power chip is written directly so unplugging USB leaves her running on the battery once the cell is past 3600 mV. Below that she is connected but too empty to hold the 3.3 V rails, so leave the cable in. From fully off, USB or a short press of the upper PWR button turns it on. Holding that button about 6 seconds turns the board off. Red wire to the + mark. |
+| Battery | AXP2101 via XPowersLib. Charging on: temperature pin off, 200 mA, 4.2 V. The battery switch is forced on, and the power chip is written directly, so the cell can charge and can run the board once it is past 3600 mV. A cell already at 4.2 V sits idle instead of being pushed higher. Below 3600 mV leave the cable in. From fully off, USB or a short press of the upper PWR button turns it on. Holding that button about 6 seconds turns the board off. Red wire to the + mark. |
 | Grown-up screen | both buttons held 5 s, native-resolution text |
 
 The three Library Manager installs are listed under Arduino IDE.
