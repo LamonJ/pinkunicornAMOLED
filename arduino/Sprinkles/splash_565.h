@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#define SPLASH_W 466
-#define SPLASH_H 466
+#define SPLASH_W 233
+#define SPLASH_H 233
 
 extern const uint16_t splash_565[SPLASH_W * SPLASH_H];
 

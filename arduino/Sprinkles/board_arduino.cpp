@@ -14,6 +14,7 @@
 #include <Arduino.h>
 #include <stdlib.h>
 #include <string.h>
+#include <esp_system.h>
 #include "splash_565.h"
 #include <Wire.h>
 #include <Preferences.h>
@@ -366,18 +367,33 @@ extern "C" void board_diag_fail(const char *line)
     diag_y += 24;
 }
 
-/* Same path as her frames: a PSRAM buffer, pushed, then released. */
+/* The stored picture is half the glass. Each pixel is drawn as a 2x2
+ * block, which is what fits in a 1.25 MB app slot. */
 static void show_splash(void)
 {
-    size_t nbytes = sizeof splash_565;
+    static_assert(SPLASH_W * 2 == 466 && SPLASH_H * 2 == 466,
+                  "splash is doubled onto the 466 panel");
+    const int dw = SPLASH_W * 2;
+    size_t nbytes = (size_t)dw * dw * sizeof(uint16_t);
     uint16_t *buf = (uint16_t *)ps_malloc(nbytes);
-    if (buf) {
-        memcpy(buf, splash_565, nbytes);
-        gfx->draw16bitRGBBitmap(0, 0, buf, SPLASH_W, SPLASH_H);
-        free(buf);
-    } else {
-        gfx->draw16bitRGBBitmap(0, 0, (uint16_t *)splash_565, SPLASH_W, SPLASH_H);
+    if (!buf) {
+        gfx->fillScreen(RGB565_BLACK);
+        return;
     }
+    for (int y = 0; y < SPLASH_H; y++) {
+        const uint16_t *src = splash_565 + (size_t)y * SPLASH_W;
+        uint16_t *row0 = buf + (size_t)(y * 2) * dw;
+        uint16_t *row1 = row0 + dw;
+        for (int x = 0; x < SPLASH_W; x++) {
+            uint16_t p = src[x];
+            row0[x * 2]     = p;
+            row0[x * 2 + 1] = p;
+            row1[x * 2]     = p;
+            row1[x * 2 + 1] = p;
+        }
+    }
+    gfx->draw16bitRGBBitmap(0, 0, buf, dw, dw);
+    free(buf);
 }
 
 extern "C" void board_panel_push(const uint16_t *fb565)
@@ -667,7 +683,10 @@ extern "C" void board_stamp_save(const char *stamp)
 
 extern "C" bool board_woke_from_deep_sleep(void)
 {
-    return esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT1;
+    /* Only a deep-sleep wake skips the picture. Light sleep leaves an EXT1
+     * cause behind, and that cause can still be set after the power comes
+     * back, which hid the splash on the boot that followed a power loss. */
+    return esp_reset_reason() == ESP_RST_DEEPSLEEP;
 }
 
 extern "C" void board_deep_sleep(void)

@@ -128,8 +128,8 @@ void board_sleep_until_touched(void);
  * time and the pet is in NVS, with the catch-up maths unit-tested. */
 void board_deep_sleep(void);
 
-/* True when this boot came from board_deep_sleep rather than power-on, so
- * the caller can skip the boot diagnostics and go straight to her. */
+/* True only when this boot is a deep-sleep wake. Power-on and brownout
+ * are not: those show the splash picture. */
 bool board_woke_from_deep_sleep(void);
 
 #ifdef __cplusplus

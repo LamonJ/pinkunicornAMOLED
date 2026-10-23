@@ -187,10 +187,8 @@ void setup()
     for (int i = 0; i < 30 && !Serial; i++) delay(100);
     delay(300);
 
-    /* Waking from deep sleep is a full boot, so the usual start-up theatre
-     * would play every single time she is woken. Skip it and go straight to
-     * her - the point is that pressing the button feels like waking a pet,
-     * not like switching on a device. */
+    /* Deep sleep is the only boot that skips her picture. Power coming
+     * back, a brownout, and an upload all show it. */
     bool woke = board_woke_from_deep_sleep();
 
     Serial.println();

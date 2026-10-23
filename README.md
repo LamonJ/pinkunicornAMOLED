@@ -139,7 +139,7 @@ ESP32-S3-Touch-AMOLED-1.75, and the scene code. Open it and Upload. You do
 not copy pins in from the Waveshare examples, and you do not run a generator
 before the first flash.
 
-Turning the board on shows her picture, then the pet.
+Turning the board on shows her picture, then the pet. The picture also comes back after the power has been lost.
 
 ![Splash](docs/splash.png)
 
