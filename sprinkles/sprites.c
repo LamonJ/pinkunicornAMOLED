@@ -366,16 +366,19 @@ void spr_dead(double t)
         }
     }
 
-    gfx_ellipse(32, 50, 20, 8, C_DARK);
-    gfx_ellipse(32, 50, 19, 7, C_COAT);
-    gfx_ellipse(22, 46, 4, 2, C_COATHI);
+    /* One line, high enough that the round glass does not cut a word.
+     * HATCH is 19 wide, NEW and EGG are 11, with a 3px gap between words.
+     * The line runs x 9..55, y 43..47, centred on the pill. */
+    gfx_ellipse(32, 45, 29, 8, C_DARK);
+    gfx_ellipse(32, 45, 28, 7, C_COAT);
+    gfx_ellipse(18, 40, 5, 2, C_COATHI);
     {
         const char **hatch[5] = { GLY_H, GLY_A, GLY_T, GLY_C, GLY_H };
         const char **neu[3]   = { GLY_N, GLY_E, GLY_W };
         const char **egg[3]   = { GLY_E, GLY_G, GLY_G };
-        word(22, 45, hatch, 5, C_DARK);   /* HATCH, width 19, centred */
-        word(19, 51, neu,   3, C_DARK);   /* NEW */
-        word(33, 51, egg,   3, C_DARK);   /* EGG, one gap after NEW */
+        word(9,  43, hatch, 5, C_DARK);
+        word(31, 43, neu,   3, C_DARK);
+        word(45, 43, egg,   3, C_DARK);
     }
     gfx_dim = saved;
 }

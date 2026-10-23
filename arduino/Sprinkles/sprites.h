@@ -113,12 +113,12 @@ int    spr_perk_wig(double anim_t);
 #define BTN_Y       35
 #define BTN_HIT_R   14
 
-/* Hatch button on the dead scene. Two short lines: the round glass
- * clips a single "HATCH A NEW EGG" along the bottom edge. */
-#define HATCH_X0 12
-#define HATCH_X1 52
-#define HATCH_Y0 42
-#define HATCH_Y1 58
+/* Hatch button on the dead scene. One line, HATCH NEW EGG, above the
+ * curve so the round glass does not clip a word. */
+#define HATCH_X0 3
+#define HATCH_X1 61
+#define HATCH_Y0 37
+#define HATCH_Y1 53
 
 #ifdef __cplusplus
 }

@@ -78,7 +78,7 @@ It falls while she is awake, about one pip every 8 minutes. A full bar lasts abo
 
 ## When she dies
 
-The heart bar at 0 is the end, from one cake too many or from being left. She lies still, and a button underneath reads HATCH / NEW EGG. Tap it and she starts over as an egg.
+The heart bar at 0 is the end, from one cake too many or from being left. She lies still, and a button underneath reads Hatch New Egg. Tap it and she starts over as an egg.
 
 ![Dead, with the hatch button](docs/dead.png)
 

@@ -661,6 +661,44 @@ static void test_overfeed_and_hatch(void)
     CHECK(coat > 40, "the button is filled, got %d coat px", coat);
     CHECK(gfx_dim == 1.0, "dead frame restores brightness");
 
+    /* One line: HATCH at x9, NEW at x31, EGG at x45, all on y43.
+     * Each ink pixel has to sit fully inside the round glass. */
+    {
+        struct { int x, y; rgb_t c; const char *what; } ink[] = {
+            {  9, 43, C_DARK, "H" },
+            { 14, 43, C_DARK, "A" },
+            { 17, 43, C_DARK, "T" },
+            { 21, 43, C_DARK, "C" },
+            { 25, 43, C_DARK, "H" },
+            { 28, 45, C_COAT, "gap after HATCH" },
+            { 31, 43, C_DARK, "N" },
+            { 35, 43, C_DARK, "E" },
+            { 39, 43, C_DARK, "W" },
+            { 42, 45, C_COAT, "gap after NEW" },
+            { 45, 43, C_DARK, "E" },
+            { 49, 43, C_DARK, "G" },
+            { 53, 43, C_DARK, "G" },
+            { 55, 47, C_DARK, "last G" },
+        };
+        int r2 = GFX_CIRCLE_R * GFX_CIRCLE_R;
+        for (unsigned i = 0; i < sizeof ink / sizeof *ink; i++) {
+            int x = ink[i].x, y = ink[i].y;
+            CHECK(gfx_fb[y * GFX_W + x] == ink[i].c,
+                  "%s pixel, got %06X", ink[i].what, gfx_fb[y * GFX_W + x]);
+            if (ink[i].c != C_DARK) continue;
+            int x0 = GFX_OFFSET + x * GFX_SCALE;
+            int y0 = GFX_OFFSET + y * GFX_SCALE;
+            int clipped = 0;
+            for (int py = y0; py < y0 + GFX_SCALE && !clipped; py++) {
+                for (int px = x0; px < x0 + GFX_SCALE; px++) {
+                    int dx = px - GFX_CIRCLE_C, dy = py - GFX_CIRCLE_C;
+                    if (dx * dx + dy * dy > r2) { clipped = 1; break; }
+                }
+            }
+            CHECK(!clipped, "%s is inside the round glass", ink[i].what);
+        }
+    }
+
     unsigned long sum0 = 0, sum1 = 0;
     app_frame(&A, 0, hb_now);
     for (int i = 0; i < 40 * GFX_W; i++) sum0 += gfx_fb[i];
@@ -673,7 +711,7 @@ static void test_overfeed_and_hatch(void)
     app_button(&A, hb_now, 1);
     CHECK(A.pet.stage == ST_DEAD && !A.pet.napping, "a side button does not nap her");
     app_touch(&A, hb_now, 32, 50);
-    CHECK(A.pet.stage == ST_EGG, "Hatch a New Egg starts over");
+    CHECK(A.pet.stage == ST_EGG, "Hatch New Egg starts over");
     CHECK(A.pet.hunger == 4 && A.pet.happy == 4 && A.pet.energy == 4,
           "the egg's meters are full");
 }
