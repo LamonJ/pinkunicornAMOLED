@@ -536,22 +536,26 @@ static void queue_action(app_t *a, int64_t now_ms, int which)
     PLAY(SND_PRESS);
 }
 
-/* A pile is drawn around (mess_x, 53). The box is a finger wider than the
- * sprite, and it stops short of her paws so a pet does not sweep. */
+/* A pile sits near y=53. A small finger misses that sprite, so any press
+ * along the bottom of the glass sweeps when there is poop, and a wide box
+ * around each pile catches a press that landed a little high. */
 static bool on_mess(const app_t *a, double wx, double wy)
 {
+    if (a->pet.mess <= 0) return false;
+    if (wy >= 50.0) return true;
     for (int i = 0; i < a->pet.mess; i++) {
         double dx = wx - a->pet.mess_x[i];
         double dy = wy - 53.0;
-        if (dx * dx <= 144.0 && dy * dy <= 144.0) return true;
+        if (dx * dx <= 400.0 && dy * dy <= 225.0) return true;
     }
     return false;
 }
 
-/* Hunger cake and its pips, top of the screen. */
+/* Hunger cake and its pips. The moon icon starts at x=33, so this stays
+ * in the top left and a press on the moon does not feed her. */
 static bool on_cake_meter(double wx, double wy)
 {
-    return wx >= 4 && wx <= 36 && wy >= 4 && wy <= 16;
+    return wx >= 0 && wx <= 32 && wy >= 0 && wy <= 20;
 }
 
 /* The word MUTE, under the meters. Only drawn while the speaker is off. */
@@ -586,7 +590,9 @@ bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
     if (a->hold_fired) return false;
     double dx = x - a->hold_x, dy = y - a->hold_y;
     if (dx * dx + dy * dy > 25.0) {
-        a->hold_fired = true;            /* a drag is not a mute */
+        /* A moving finger is not a mute. Leave hold_fired clear so the
+         * lift can still feed or sweep. */
+        a->hold_down = false;
         return false;
     }
     if (now_ms - a->hold_at < APP_HOLD_MS) return false;

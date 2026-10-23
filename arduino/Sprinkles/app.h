@@ -66,7 +66,9 @@ typedef struct {
     int     birthday_age;
 
     /* Finger-down tracking for the mute hold. hold_fired stays set until
-     * the finger lifts, so the release is not also a tap. */
+     * the finger lifts after a finished mute, so that release is not also
+     * a tap. A slide clears the hold instead, and the lift can still feed
+     * or sweep. */
     bool    hold_down;
     bool    hold_fired;
     int64_t hold_at;

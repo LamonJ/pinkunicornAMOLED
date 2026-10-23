@@ -231,7 +231,7 @@ void setup()
     Serial.printf ("RTC     : %s\n", board_rtc_ok()   ? "OK" : "FAILED");
     Serial.printf ("IMU     : %s\n", board_imu_ok()   ? "OK" : "FAILED");
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
-    Serial.println("tap the cake meter = feed | tap a pile = sweep | tap MUTE = sound");
+    Serial.println("tap the top left = feed | tap the bottom = sweep | tap MUTE = sound");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",
@@ -379,8 +379,9 @@ after_input:;
         app_picked_up(&app, now);
     }
 
-    /* A real tap: pressed and released in the same place, quickly. Small
-     * hands smear, so allow a little travel but not a drag. */
+    /* A real tap: pressed and released quickly. A small finger slides, so
+     * twenty world pixels (about 140 on the glass) still counts. A finished
+     * mute hold does not. */
     double tx = 0, ty = 0;
     bool down = board_touch(&tx, &ty);
     if (down) { last_x = tx; last_y = ty; }
@@ -394,12 +395,15 @@ after_input:;
     bool held = app.hold_fired;
     if (!down) app_hold(&app, now, 0, 0, 0);
     if (!down && touch_was_down && !held &&
-        now - down_at < 400 &&
-        fabs(last_x - down_x) < 5 && fabs(last_y - down_y) < 5) {
+        now - down_at < 700 &&
+        fabs(last_x - down_x) < 20 && fabs(last_y - down_y) < 20) {
         Serial.printf("[tap] raw %d,%d -> world %.1f,%.1f\n",
                       board_touch_raw_x, board_touch_raw_y, down_x, down_y);
+        int pending = app.act_pending;
         stage_t before = app.pet.stage;
         app_touch(&app, now, down_x, down_y);
+        if (app.act_pending == 1 && pending != 1) Serial.println("[tap] -> feed");
+        if (app.act_pending == 2 && pending != 2) Serial.println("[tap] -> sweep");
         /* Save straight away after anything a child would notice losing. */
         if (app.pet.stage != before || app.anim == AN_EAT || app.evo_queued) {
             save_state();

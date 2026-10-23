@@ -265,6 +265,7 @@ static void test_dark_screen_restores_energy(void)
     CHECK(A.pet.energy == 0, "she has only just nodded off, got %d", A.pet.energy);
     hb_now += 12LL * 60 * 1000;
     app_touch(&A, hb_now, 0, 0);
+    CHECK(A.act_pending == 0, "lighting the glass does not also feed");
     CHECK(!A.screen_off, "the tap brings the picture back");
     CHECK(!A.pet.napping && !A.pet.asleep, "she is awake");
     CHECK(A.pet.energy == 4, "twelve dark minutes fill an empty bar, got %d",
@@ -283,6 +284,7 @@ static void test_dark_screen_restores_energy(void)
     hb_now += 4LL * 60 * 1000;
     int beeps = hb_beeps;
     app_touch(&A, hb_now, 0, 0);
+    CHECK(A.act_pending == 0, "a dark-screen tap at the corner does not feed");
     CHECK(!A.screen_off, "the picture is back");
     CHECK(hb_beeps > beeps, "she chimes when the tap gets her up");
     CHECK(!A.pet.napping && !A.pet.asleep, "a tap gets her up");
@@ -520,6 +522,41 @@ static void test_sleeping_tap_wakes_and_acts(void)
     CHECK(A.act_pending == 0, "and does not feed");
 }
 
+/* A small finger does not land on the sprite. The top left feeds. The
+ * bottom of the glass sweeps whenever there is poop, even away from the
+ * pile's x. The moon stays a moon. */
+static void test_generous_cake_and_bottom(void)
+{
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 2, 2);
+    CHECK(A.act_pending == 1, "the top left of the glass feeds");
+    frames(1100);
+    CHECK(A.pet.hunger == 3, "that cake landed, got %d", A.pet.hunger);
+
+    boot(ST_ROYAL);
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 40, 12);
+    CHECK(A.act_pending == 0, "the moon is not the cake");
+    CHECK(A.pet.hunger == 2, "hunger unchanged");
+
+    boot(ST_ROYAL);
+    A.pet.mess = 1;
+    A.pet.mess_x[0] = 13;
+    A.pet.hunger = 2;
+    app_touch(&A, hb_now, 45.9, 61.1);
+    CHECK(A.act_pending == 2, "the bottom of the glass sweeps");
+    CHECK(A.pet.hunger == 2, "and does not feed");
+    frames(1100);
+    CHECK(A.pet.mess == 0, "the pile is gone");
+
+    boot(ST_ROYAL);
+    A.pet.mess = 1;
+    A.pet.mess_x[0] = 13;
+    app_touch(&A, hb_now, 40, 30);
+    CHECK(A.act_pending == 0, "a high tap away from the pile does not sweep");
+}
+
 /* A still hold mutes. Another hold brings the sound back. The word MUTE
  * is on screen the whole time it is quiet, and a new egg keeps the choice. */
 static void test_hold_mutes(void)
@@ -549,11 +586,12 @@ static void test_hold_mutes(void)
     CHECK(A.pet.sound && hb_audio, "speaker is back");
     CHECK(hb_beeps == beeps + 1, "unmuting plays a note");
 
-    /* A slide is not a mute. */
+    /* A slide is not a mute, and it must not eat the tap on the way up. */
     app_hold(&A, t + 4000, 0, 0, 0);
     app_hold(&A, t + 4100, 1, 10, 10);
     CHECK(!app_hold(&A, t + 4100 + APP_HOLD_MS, 1, 40, 10), "a drag does not mute");
     CHECK(A.pet.sound, "still on after the drag");
+    CHECK(!A.hold_fired, "a slide can still be a tap");
 
     boot(ST_DEAD);
     A.pet.happy = 0;
@@ -666,6 +704,7 @@ int main(void)
         { "dark screen restores energy",  test_dark_screen_restores_energy },
         { "waking tap is swallowed",      test_first_tap_after_wake_is_swallowed },
         { "sleeping tap wakes and acts",  test_sleeping_tap_wakes_and_acts },
+        { "cake and bottom are generous", test_generous_cake_and_bottom },
         { "roll conditions",              test_roll_conditions },
         { "peek pushes roll out",         test_peek_pushes_roll_out },
         { "egg can be tapped out",        test_egg_tap },
