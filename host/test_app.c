@@ -661,24 +661,38 @@ static void test_overfeed_and_hatch(void)
     CHECK(coat > 40, "the button is filled, got %d coat px", coat);
     CHECK(gfx_dim == 1.0, "dead frame restores brightness");
 
-    /* One line: HATCH at x9, NEW at x31, EGG at x45, all on y43.
-     * Each ink pixel has to sit fully inside the round glass. */
+    /* HATCH at x7, wide NEW at x28, EGG at x47, all on y43.
+     * The wide W is open at the bottom corners, which is what keeps it
+     * from being the same shape as H. Each ink pixel sits on the glass. */
     {
         struct { int x, y; rgb_t c; const char *what; } ink[] = {
-            {  9, 43, C_DARK, "H" },
-            { 14, 43, C_DARK, "A" },
-            { 17, 43, C_DARK, "T" },
-            { 21, 43, C_DARK, "C" },
-            { 25, 43, C_DARK, "H" },
-            { 28, 45, C_COAT, "gap after HATCH" },
-            { 31, 43, C_DARK, "N" },
-            { 35, 43, C_DARK, "E" },
-            { 39, 43, C_DARK, "W" },
-            { 42, 45, C_COAT, "gap after NEW" },
-            { 45, 43, C_DARK, "E" },
-            { 49, 43, C_DARK, "G" },
-            { 53, 43, C_DARK, "G" },
-            { 55, 47, C_DARK, "last G" },
+            {  7, 43, C_DARK, "H" },
+            { 12, 43, C_DARK, "A" },
+            { 15, 43, C_DARK, "T" },
+            { 19, 43, C_DARK, "C" },
+            { 23, 43, C_DARK, "H" },
+            { 26, 45, C_COAT, "gap after HATCH" },
+            { 28, 43, C_DARK, "N left stem" },
+            { 32, 43, C_DARK, "N right stem" },
+            { 29, 44, C_DARK, "N diagonal" },
+            { 30, 45, C_DARK, "N diagonal middle" },
+            { 31, 46, C_DARK, "N diagonal" },
+            { 34, 43, C_DARK, "E" },
+            { 37, 45, C_DARK, "E middle bar" },
+            { 38, 45, C_COAT, "E middle stops short" },
+            { 40, 43, C_DARK, "W left" },
+            { 42, 43, C_DARK, "W middle" },
+            { 44, 43, C_DARK, "W right" },
+            { 41, 43, C_COAT, "W top gap" },
+            { 40, 47, C_COAT, "W is not an H" },
+            { 44, 47, C_COAT, "W is not an H" },
+            { 41, 47, C_DARK, "W left foot" },
+            { 43, 47, C_DARK, "W right foot" },
+            { 45, 45, C_COAT, "gap after NEW" },
+            { 47, 43, C_DARK, "E of EGG" },
+            { 51, 43, C_DARK, "G" },
+            { 55, 43, C_DARK, "G" },
+            { 57, 47, C_DARK, "last G" },
         };
         int r2 = GFX_CIRCLE_R * GFX_CIRCLE_R;
         for (unsigned i = 0; i < sizeof ink / sizeof *ink; i++) {

@@ -289,9 +289,11 @@ static const char *GLY_H[] = { "#.#", "#.#", "###", "#.#", "#.#" };
 static const char *GLY_A[] = { ".#.", "#.#", "###", "#.#", "#.#" };
 static const char *GLY_T[] = { "###", ".#.", ".#.", ".#.", ".#." };
 static const char *GLY_C[] = { "###", "#..", "#..", "#..", "###" };
-static const char *GLY_N[] = { "#.#", "##.", "#.#", "#.#", "#.#" };
 static const char *GLY_E[] = { "###", "#..", "##.", "#..", "###" };
-static const char *GLY_W[] = { "#.#", "#.#", "###", "#.#", "#.#" };
+/* 5 wide. A 3-wide N reads as K, and a 3-wide W is the same drawing as H. */
+static const char *GLY_N5[] = { "#...#", "##..#", "#.#.#", "#..##", "#...#" };
+static const char *GLY_E5[] = { "#####", "#....", "####.", "#....", "#####" };
+static const char *GLY_W5[] = { "#.#.#", "#.#.#", "#.#.#", "#.#.#", ".#.#." };
 static const char *GLY_G[] = { "###", "#..", "##.", "#.#", "###" };
 static const char *GLY_M[] = { "#.#", "###", "#.#", "#.#", "#.#" };
 static const char *GLY_U[] = { "#.#", "#.#", "#.#", "#.#", "###" };
@@ -366,19 +368,19 @@ void spr_dead(double t)
         }
     }
 
-    /* One line, high enough that the round glass does not cut a word.
-     * HATCH is 19 wide, NEW and EGG are 11, with a 3px gap between words.
-     * The line runs x 9..55, y 43..47, centred on the pill. */
-    gfx_ellipse(32, 45, 29, 8, C_DARK);
-    gfx_ellipse(32, 45, 28, 7, C_COAT);
+    /* One line, above the curve. NEW is the wider alphabet so it
+     * does not read as KEH. HATCH x7..25, NEW x28..44, EGG x47..57. */
+    gfx_ellipse(32, 45, 30, 8, C_DARK);
+    gfx_ellipse(32, 45, 29, 7, C_COAT);
     gfx_ellipse(18, 40, 5, 2, C_COATHI);
     {
         const char **hatch[5] = { GLY_H, GLY_A, GLY_T, GLY_C, GLY_H };
-        const char **neu[3]   = { GLY_N, GLY_E, GLY_W };
         const char **egg[3]   = { GLY_E, GLY_G, GLY_G };
-        word(9,  43, hatch, 5, C_DARK);
-        word(31, 43, neu,   3, C_DARK);
-        word(45, 43, egg,   3, C_DARK);
+        word(7,  43, hatch, 5, C_DARK);
+        map1(28, 43, GLY_N5, 5, C_DARK);
+        map1(34, 43, GLY_E5, 5, C_DARK);
+        map1(40, 43, GLY_W5, 5, C_DARK);
+        word(47, 43, egg,   3, C_DARK);
     }
     gfx_dim = saved;
 }
