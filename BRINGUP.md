@@ -24,9 +24,10 @@
 > - The touch interrupt alone still misses taps, so the 500 ms timer wake
 >   also POLLS touch, BOOT, PWR and the IMU. Belt and braces; a toy you have
 >   to fight to wake is a broken toy.
-> - **Battery** is AXP2101 at 0x34 via XPowersLib. Measurement is enabled;
->   charge current and target voltage are deliberately left as the board
->   ships them.
+> - **Battery** is AXP2101 at 0x34 via XPowersLib. Charging is enabled at
+>   200 mA to 4.2 V, and the TS pin is turned off because this board has no
+>   battery thermistor. USB powers the board on. Battery-only needs a short
+>   press of PWR; holding PWR about 6 seconds powers it off at the chip.
 > - **There is no clock-driven bedtime.** She sleeps only when napped or when
 >   out of energy. An earlier 20:00-07:00 window made every button look dead
 >   for anyone who flashed after 8pm, because the next tick re-slept her.

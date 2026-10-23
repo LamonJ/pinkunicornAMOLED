@@ -835,18 +835,28 @@ extern "C" void board_init(void)
     /* Audio last: it is the only one the toy can do without. */
     audio_ok = audio_begin();
 
-    /* PMIC, for battery telemetry. Measurement only - charge current and
-     * target voltage are left as the board ships them. */
+    /* PMIC. USB turns the board on by itself. A battery does not: the
+     * charger stays off until we ask, and with no thermistor on TS the
+     * chip refuses to charge. Waveshare's profile, at a gentler 200 mA
+     * because the cell is in a closed case. 4.2 V is a normal LiPo. */
     if (!pmu.begin(Wire, AXP2101_SLAVE_ADDRESS, IIC_SDA, IIC_SCL)) {
         Serial.println("AXP2101 not found - no battery telemetry");
     } else {
         pmu_ok = true;
+        pmu.disableTSPinMeasure();
         pmu.enableBattDetection();
         pmu.enableBattVoltageMeasure();
         pmu.enableVbusVoltageMeasure();
         pmu.enableSystemVoltageMeasure();
-        Serial.printf("PMU OK, battery %s\n",
-                      pmu.isBatteryConnect() ? "present" : "absent");
+        pmu.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_50MA);
+        pmu.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_200MA);
+        pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
+        pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
+        pmu.enableCharge();
+        Serial.printf("PMU OK, battery %s, %d mV, charge %s\n",
+                      pmu.isBatteryConnect() ? "present" : "absent",
+                      pmu.getBattVoltage(),
+                      pmu.isCharging() ? "on" : "idle");
     }
 
     /* I/O expander, for the PWR button on EXIO4. */
