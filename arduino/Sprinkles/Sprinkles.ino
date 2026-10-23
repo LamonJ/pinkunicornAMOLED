@@ -447,11 +447,10 @@ after_input:;
     static int64_t last_beat = 0;
     frames++;
     if (now - last_beat >= 2000) {
-        int cell_mv = 0;
-        bool charging = false;
-        board_battery(NULL, &cell_mv, &charging, NULL);
+        char batt[80];
+        board_batt_info(batt, (int)sizeof batt);
         Serial.printf("[%6lus] %-12s cake=%d heart=%d energy=%d mess=%d "
-                      "asleep=%d menu=%d screen=%s %d fps cell=%dmV %s\n",
+                      "asleep=%d menu=%d screen=%s %d fps %s\n",
                       (unsigned long)(now / 1000),
                       PET_STAGE_NAME[app.pet.stage],
                       app.pet.hunger, app.pet.happy, app.pet.energy,
@@ -459,8 +458,7 @@ after_input:;
                       app_menu_visible(&app),
                       app.screen_off ? "off" : "on",
                       frames / 2,
-                      cell_mv,
-                      charging ? "charging" : "idle");
+                      batt);
         frames = 0; last_beat = now;
     }
 

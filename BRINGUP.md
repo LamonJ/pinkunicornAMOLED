@@ -29,7 +29,9 @@
 >   USB is unplugged. Those bits are written on the bus (see `pmu_hold.h`),
 >   including a 2.6 V power-off floor and charge-done leaving the cell
 >   connected. A cell under 3600 mV is seen but too empty to hold the 3.3 V
->   rails; leave USB in until the boot line passes that. USB powers a fully
+>   rails; leave USB in until the boot line passes that. A flat cell can
+>   latch the charger off (safety timer or the missing thermistor); boot
+>   clears that latch and prints vbus and status bytes. USB powers a fully
 >   off board on. Holding PWR about 6 seconds powers it off at the chip.
 >   Red wire to the + mark.
 > - **There is no clock-driven bedtime.** She sleeps only when napped or when

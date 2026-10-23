@@ -26,7 +26,19 @@ int main(void)
     CHECK(pmu_hold_apply(0x23, 0x3F) == 0x20, "undervoltage latch off, overvoltage stays");
     CHECK(pmu_hold_apply(0x18, 0x0B) == 0x0A, "watchdog off, charge and gauge stay");
     CHECK(pmu_hold_apply(0x1A, 0xA1) == 0xA0, "shutdown percent cleared, warning kept");
-    CHECK(pmu_hold_apply(0x68, 0x01) == 0x00, "detection off so the cell counts");
+    CHECK(pmu_hold_apply(0x54, 0x29) == 0xFF, "charge cold limit opened");
+    CHECK(pmu_hold_apply(0x55, 0x58) == 0x00, "charge hot limit opened");
+    CHECK(pmu_hold_apply(0x58, 0x01) == 0x00, "JEITA off");
+    CHECK(pmu_hold_apply(0x61, 0x05) == 0x02, "precharge becomes 50 mA");
+    CHECK(pmu_hold_apply(0x62, 0x1F) == 0x08, "fast charge becomes 200 mA");
+    CHECK(pmu_hold_apply(0x64, 0x00) == 0x03, "target becomes 4.2 V");
+    CHECK(pmu_hold_apply(0x67, 0xFF) == 0xFB, "precharge timer off, other bits stay");
+    CHECK(pmu_detect_set(0x00, 1) == 0x01, "detection can be turned on");
+    CHECK(pmu_detect_set(0x01, 0) == 0x00, "detection can be forced present");
+    CHECK(pmu_charge_active(0x05) == 0, "not charging is idle");
+    CHECK(pmu_charge_active(0x01) == 1, "precharge is charging");
+    CHECK(pmu_charge_active(0x22) == 1, "constant current is charging");
+    CHECK(pmu_charge_active(0x04) == 0, "charge done is not current");
     CHECK(pmu_hold_apply(0x56, 0x3E) == 0xFF, "cold limit opened");
     CHECK(pmu_hold_apply(0x57, 0x4C) == 0x00, "hot limit opened");
     CHECK(pmu_hold_apply(0x99, 0x5A) == 0x5A, "unknown register left alone");
@@ -47,7 +59,8 @@ int main(void)
     CHECK(strcmp(pmu_chg_name(-1), "unread") == 0, "failed status read");
 
     static const uint8_t addrs[] = {
-        0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50, 0x56, 0x57, 0x63, 0x68
+        0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
+        0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
     };
     for (unsigned i = 0; i < sizeof addrs; i++) {
         same_twice(addrs[i], 0x00);

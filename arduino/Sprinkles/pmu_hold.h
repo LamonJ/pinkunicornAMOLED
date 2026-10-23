@@ -24,12 +24,34 @@ static inline uint8_t pmu_hold_apply(uint8_t addr, uint8_t cur)
     case 0x23: return (uint8_t)(cur & 0xE0);          /* a dip must not latch off */
     case 0x24: return (uint8_t)(cur & 0xF8);          /* power off at 2.6 V */
     case 0x50: return (uint8_t)((cur & 0xE0) | 0x10); /* TS is not a thermistor */
+    case 0x54: return 0xFF;                           /* charge cold limit open */
+    case 0x55: return 0x00;                           /* charge hot limit open */
     case 0x56: return 0xFF;                           /* cold limit out of reach */
     case 0x57: return 0x00;                           /* hot limit out of reach */
+    case 0x58: return (uint8_t)(cur & 0xFE);          /* no JEITA without a sensor */
+    case 0x61: return (uint8_t)((cur & 0xF0) | 0x02); /* precharge 50 mA */
+    case 0x62: return (uint8_t)((cur & 0xE0) | 0x08); /* constant 200 mA */
     case 0x63: return (uint8_t)(cur & 0xEF);          /* do not open the cell */
-    case 0x68: return (uint8_t)(cur & 0xFE);          /* cell counts as present */
+    case 0x64: return (uint8_t)((cur & 0xF8) | 0x03); /* stop at 4.2 V */
+    case 0x67: return (uint8_t)((cur & 0xFB) | 0x40); /* precharge timer off */
     default:   return cur;
     }
+}
+
+/* Battery detection is chosen at boot. On lets the chip see the cell.
+ * Off forces "always present" when that check refuses to start the charger. */
+static inline uint8_t pmu_detect_set(uint8_t cur, int on)
+{
+    return on ? (uint8_t)(cur | 0x01) : (uint8_t)(cur & 0xFE);
+}
+
+/* reg 0x01: direction bits 6:5, state bits 2:0. Trickle through constant
+ * voltage count as charging. "Done" and "not charging" do not. */
+static inline int pmu_charge_active(int stat1)
+{
+    if (stat1 < 0) return 0;
+    if (((stat1 >> 5) & 3) == 1) return 1;
+    return (stat1 & 7) <= 3;
 }
 
 /* The board makes 3.3 V for the computer from the cell. Under about 3.6 V

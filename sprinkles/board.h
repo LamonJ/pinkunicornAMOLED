@@ -37,6 +37,8 @@ bool board_pwr_ok(void);
  * percent is -1 when no cell is attached. Charge current and the registers
  * that keep the cell powering the board live in the Arduino board code. */
 void board_battery(int *percent, int *millivolts, bool *charging, bool *present);
+/* One serial phrase: cell voltage, USB voltage, charger state, status bytes. */
+void board_batt_info(char *buf, int len);
 
 /* ---- grown-up screen --------------------------------------------------
  * Drawn at native panel resolution with the display library's own font, NOT

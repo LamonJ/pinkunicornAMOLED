@@ -2,6 +2,7 @@
  * Sounds and pushes are recorded rather than performed, which lets tests
  * assert on them. */
 #include "../sprinkles/board.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -54,6 +55,8 @@ bool board_audio_ok(void) { return false; }
 bool board_pwr_ok(void) { return false; }
 void board_battery(int *p, int *mv, bool *c, bool *pr)
 { if(p)*p=-1; if(mv)*mv=0; if(c)*c=false; if(pr)*pr=false; }
+void board_batt_info(char *buf, int len)
+{ if (buf && len > 0) snprintf(buf, (size_t)len, "n/a"); }
 void board_dev_screen(const char *const *l, int n, const char *b, int d)
 { (void)l; (void)n; (void)b; (void)d; }
 bool board_button_pressed(int w) { (void)w; return false; }

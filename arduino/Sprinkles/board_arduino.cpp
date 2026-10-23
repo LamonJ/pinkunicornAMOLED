@@ -151,8 +151,12 @@ static bool exp_write(uint8_t reg, uint8_t val)
  * missed. */
 static int64_t mono_extra = 0;
 static bool pmu_ok = false;
+static int pmu_detect_on = 1;
+static int pmu_rd(uint8_t reg);
 static void pmu_hold_battery(bool log_it);
 static int pmu_cell_mv(void);
+static int pmu_vbus_mv(void);
+static void pmu_reclose_battery(void);
 
 extern "C" int64_t board_now_ms(void)
 {
@@ -514,9 +518,29 @@ extern "C" void board_battery(int *percent, int *mv, bool *charging, bool *prese
      * cell still shows up on the ADC, which is the reading we trust. */
     bool have = pmu.isBatteryConnect() || raw >= PMU_CELL_PRESENT_MV;
     if (present) *present = have;
+    int stat1 = pmu_rd(0x01);
+    if (charging) *charging = pmu_charge_active(stat1) != 0;
     if (!have) return;
-    if (percent)  *percent  = pmu.getBatteryPercent();
-    if (charging) *charging = pmu.isCharging();
+    if (percent) *percent = pmu.getBatteryPercent();
+}
+
+extern "C" void board_batt_info(char *buf, int len)
+{
+    if (!buf || len <= 0) return;
+    if (!pmu_ok) {
+        snprintf(buf, (size_t)len, "cell=?");
+        return;
+    }
+    int cell = pmu_cell_mv();
+    int vbus = pmu_vbus_mv();
+    int st0 = pmu_rd(0x00);
+    int st1 = pmu_rd(0x01);
+    snprintf(buf, (size_t)len, "cell=%dmV vbus=%dmV %s st=%02X/%02X",
+             cell < 0 ? 0 : cell,
+             vbus < 0 ? 0 : vbus,
+             pmu_chg_name(st1),
+             st0 < 0 ? 0 : st0,
+             st1 < 0 ? 0 : st1);
 }
 
 /* ---- grown-up screen --------------------------------------------------- */
@@ -785,7 +809,8 @@ static bool pmu_wr(uint8_t reg, uint8_t val)
 }
 
 static const uint8_t PMU_HOLD_ADDRS[] = {
-    0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50, 0x56, 0x57, 0x63, 0x68
+    0x14, 0x16, 0x18, 0x1A, 0x23, 0x24, 0x50,
+    0x54, 0x55, 0x56, 0x57, 0x58, 0x61, 0x62, 0x63, 0x64, 0x67, 0x68
 };
 
 static void pmu_hold_battery(bool log_it)
@@ -798,6 +823,8 @@ static void pmu_hold_battery(bool log_it)
             continue;
         }
         uint8_t next = pmu_hold_apply(addr, (uint8_t)cur);
+        if (addr == 0x68)
+            next = pmu_detect_set(next, pmu_detect_on);
         if ((uint8_t)cur != next && !pmu_wr(addr, next) && log_it)
             Serial.printf("PMU 0x%02X write failed\n", addr);
         if (log_it) {
@@ -818,20 +845,68 @@ static int pmu_cell_mv(void)
     return ((hi & 0x3F) << 8) | (lo & 0xFF);
 }
 
+static int pmu_vbus_mv(void)
+{
+    int hi = pmu_rd(0x38);
+    int lo = pmu_rd(0x39);
+    if (hi < 0 || lo < 0) return -1;
+    return ((hi & 0x3F) << 8) | (lo & 0xFF);
+}
+
+/* A flat cell that sat on USB past the precharge timer is latched "not
+ * charging" until that timer is turned off and back on, and until the
+ * charger-enable bit does the same. The temperature IRQ can hold it too. */
+static void pmu_release_charger(void)
+{
+    int t = pmu_rd(0x67);
+    if (t >= 0) {
+        pmu_wr(0x67, (uint8_t)(t & ~0x44));
+        delay(20);
+        pmu_wr(0x67, (uint8_t)((t & ~0x04) | 0x40));
+    }
+    pmu_wr(0x48, 0xFF);
+    pmu_wr(0x49, 0xFF);
+    pmu_wr(0x4A, 0xFF);
+}
+
+static int pmu_try_charge(int detect_on)
+{
+    pmu_detect_on = detect_on;
+    pmu_hold_battery(false);
+    pmu_release_charger();
+    pmu_reclose_battery();
+    delay(400);
+    int stat1 = pmu_rd(0x01);
+    Serial.printf("PMU detect %s -> %02X %s\n",
+                  detect_on ? "on" : "forced",
+                  stat1 < 0 ? 0 : stat1,
+                  pmu_chg_name(stat1));
+    return stat1;
+}
+
 static void pmu_say_cell(void)
 {
     int cell = pmu_cell_mv();
-    int stat1 = pmu_rd(0x01);
+    int vbus = pmu_vbus_mv();
+    int st0 = pmu_rd(0x00);
+    int st1 = pmu_rd(0x01);
     int shown = cell < 0 ? 0 : cell;
-    if (pmu_cell_level(shown) == 0) {
-        Serial.printf("PMU cell %d mV. Red wire goes on the + mark.\n", shown);
-    } else if (pmu_cell_level(shown) == 1) {
-        Serial.printf("PMU cell %d mV, %s. Connected, but too empty to run her. "
-                      "Leave USB in until this passes %d.\n",
-                      shown, pmu_chg_name(stat1), PMU_CELL_READY_MV);
+    int level = pmu_cell_level(shown);
+    Serial.printf("PMU cell %d mV, vbus %d mV, status %02X %02X, %s.\n",
+                  shown,
+                  vbus < 0 ? 0 : vbus,
+                  st0 < 0 ? 0 : st0,
+                  st1 < 0 ? 0 : st1,
+                  pmu_chg_name(st1));
+    if (level == 0) {
+        Serial.println("PMU red wire goes on the + mark.");
+    } else if (!pmu_charge_active(st1)) {
+        Serial.println("PMU the battery is connected but the charger is not running.");
+    } else if (level == 1) {
+        Serial.printf("PMU charging. Leave USB in until this passes %d.\n",
+                      PMU_CELL_READY_MV);
     } else {
-        Serial.printf("PMU cell %d mV, %s. Unplugging USB keeps her on.\n",
-                      shown, pmu_chg_name(stat1));
+        Serial.println("PMU unplugging USB keeps her on.");
     }
 }
 
@@ -970,11 +1045,13 @@ extern "C" void board_init(void)
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
         spr_enable_cell_charge(pmu, 0);
-        /* After the library calls, so a setter cannot turn the hold back off.
-         * Then leave charge-done, which is the state that opens the switch. */
+        /* Library setters first. Then clear a latched "not charging" fault.
+         * If the chip still will not start, force the cell present and try
+         * once more. */
         pmu_hold_battery(true);
-        pmu_reclose_battery();
-        delay(50);
+        int stat1 = pmu_try_charge(1);
+        if (!pmu_charge_active(stat1))
+            pmu_try_charge(0);
         pmu_say_cell();
     }
 
