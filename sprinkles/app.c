@@ -90,10 +90,12 @@ static const spr_note_t SND_UNMUTE[]   = { {880,140},{1320,200} };
 int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
                          const char *build_stamp)
 {
-    if (!start_as_egg) return 0;
-    if (!saved_stamp || !saved_stamp[0] || !build_stamp || !build_stamp[0])
-        return 1;
-    return strcmp(saved_stamp, build_stamp) != 0;
+    /* A compile-time clock was the old "is this a new upload" test. Arduino
+     * keeps that clock when it reuses a cached build, so setting the flag
+     * again loaded the saved pet. The flag itself is the whole test. */
+    (void)saved_stamp;
+    (void)build_stamp;
+    return start_as_egg ? 1 : 0;
 }
 
 void app_wait_for_start(app_t *a)

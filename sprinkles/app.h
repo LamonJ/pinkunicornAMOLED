@@ -59,8 +59,8 @@ typedef struct {
     int     nap_sleep_after_s;
     bool    dev_menu;            /* grown-up diagnostics, both buttons 5 s  */
 
-    /* START_AS_EGG 1, and this upload has not had its button pressed.
-     * The egg is not on screen and her clock is not running. */
+    /* START_AS_EGG 1. The egg is on screen and her clock is not running
+     * until the Start button is pressed. */
     bool    awaiting_start;
 
     int64_t last_pet_tick_ms;
@@ -81,9 +81,9 @@ typedef struct {
 
 void app_init(app_t *a, int64_t now_ms);
 
-/* 1 when this upload should wait on the Start button.
- * saved_stamp is NULL or empty until the button is pressed. build_stamp
- * is this compile. A later reboot of the same upload matches, so she stays. */
+/* 1 when boot should wait on the Start button.
+ * The stamp arguments are ignored. While the flag is 1, every boot waits,
+ * including a reboot of an upload whose button was already pressed. */
 int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
                          const char *build_stamp);
 void app_wait_for_start(app_t *a);

@@ -183,11 +183,11 @@ An upload keeps the pet stored on the board. The first lines of `arduino/Sprinkl
 | `START_AS_EGG` | What a boot does |
 |---|---|
 | `0` | Keep her. No start button. This is the normal setting. |
-| `1` | Show a Start button before the egg. |
+| `1` | Every time the power comes back, show a Start button and leave the saved pet unloaded. |
 
-`1` is for a board you are sending to someone. The egg is not drawn, and her clock does not run, until that button is pressed. She does not hatch in the box. After the button, a reboot keeps her. Uploading the sketch again shows the button again. A nap does not press it.
+`1` is for a board you are sending to someone, and for starting over on purpose. Her clock does not run until that button is pressed, so she does not hatch on the way to someone. Turning the board off and on shows the button again. A nap does not press it. Set the flag back to `0` and upload to keep her across a reboot.
 
-The boot line `start   :` says which one this boot is using: `keep saved pet`, `START button, egg has not begun`, or `egg already begun on this upload`.
+The boot line `start   :` says which one this boot is using: `keep saved pet` or `START button, egg has not begun`.
 
 `python3 tools/make_arduino.py` rewrites `arduino/Sprinkles/` from
 `sprinkles/` and `arduino_src/` after you edit those. The sketch folder is

@@ -772,7 +772,7 @@ static void test_start_button_holds_the_egg(void)
     CHECK(app_gift_needs_start(1, "", "build"), "an empty stamp waits");
     CHECK(app_gift_needs_start(1, "Oct 1 2026 00:00:00", "Oct 2 2026 00:00:00"),
           "a new upload waits again");
-    CHECK(!app_gift_needs_start(1, "same", "same"), "the same upload keeps her");
+    CHECK(app_gift_needs_start(1, "same", "same"), "1 waits on every boot");
 
     boot(ST_EGG);
     A.pet.born_ms = hb_now;

@@ -1,11 +1,11 @@
 /* Start as an egg, or keep the pet saved on the board.
  *
  *   0  keep her. No start button. This is the normal setting.
- *   1  show a Start button before the egg. Her clock begins when that
- *      button is pressed, so she does not hatch on the way to someone.
+ *   1  every time the power comes back, show a Start button and do not
+ *      load the saved pet. Her clock begins when that button is pressed.
  *
- * After the button, a reboot keeps her. Uploading this sketch again
- * shows the button again. A nap does not press it. */
+ * A nap does not press the button. Set this back to 0 and upload to keep
+ * her across a reboot. */
 #define START_AS_EGG 0
 
 /* Sprinkles.ino — a unicorn cat for a five-year-old.
@@ -62,16 +62,12 @@ static void load_state(int64_t now_ms)
     app_init(&app, now_ms);
 
 #if START_AS_EGG
-    {
-        char saved[40];
-        char build[40];
-        snprintf(build, sizeof build, "%s %s", __DATE__, __TIME__);
-        bool have = board_stamp_load(saved, (int)sizeof saved);
-        if (app_gift_needs_start(1, have ? saved : NULL, build)) {
-            app_wait_for_start(&app);
-            Serial.println("START_AS_EGG is 1 - tap START. The egg has not begun.");
-            return;
-        }
+    /* Every boot, not just a boot whose compile clock changed. The saved
+     * pet stays in flash and is loaded again only when this flag is 0. */
+    if (app_gift_needs_start(1, NULL, NULL)) {
+        app_wait_for_start(&app);
+        Serial.println("START_AS_EGG is 1 - tap START. The egg has not begun.");
+        return;
     }
 #endif
 
@@ -257,8 +253,7 @@ void setup()
     Serial.printf ("PWR btn : %s\n", board_pwr_ok()   ? "OK" : "FAILED");
     Serial.printf("start   : %s\n",
                   app.awaiting_start ? "START button, egg has not begun" :
-                  START_AS_EGG ? "egg already begun on this upload" :
-                                 "keep saved pet");
+                                       "keep saved pet");
     Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");
@@ -431,9 +426,6 @@ after_input:;
         stage_t before = app.pet.stage;
         app_touch(&app, now, down_x, down_y);
         if (waited && !app.awaiting_start) {
-            char build[40];
-            snprintf(build, sizeof build, "%s %s", __DATE__, __TIME__);
-            board_stamp_save(build);
             save_state();
             last_save = now;
             Serial.println("[start] egg begins now");
