@@ -6,6 +6,10 @@
 
 #define SPLASH_PANEL 466
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     uint16_t *dst;
     uint32_t  src_w, src_h;
@@ -22,5 +26,9 @@ void splash_fit_pixels(splash_fit_t *f, uint32_t x, uint32_t y,
 
 /* Black outside the round glass. */
 void splash_fit_mask(splash_fit_t *f);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -37,11 +37,20 @@ test_pmu: host/test_pmu_hold.c arduino_src/pmu_hold.h
 test_splash_png: host/test_splash_png.c arduino_src/splash_fit.c arduino_src/pngle.c arduino_src/miniz.c
 	$(CC) $(CFLAGS) -Iarduino_src -o $@ host/test_splash_png.c arduino_src/splash_fit.c arduino_src/pngle.c arduino_src/miniz.c
 
-test: test_pet test_pmu test_splash_png
+# The sketch calls this C fitter from C++. Compile the two languages apart,
+# or a missing extern "C" links on the host and fails in the Arduino IDE.
+test_splash_link: host/test_splash_link.cpp arduino_src/splash_fit.c arduino_src/splash_fit.h
+	g++ -O2 -std=c++11 -Wall -Wextra -Iarduino_src -c -o splash_link_cpp.o host/test_splash_link.cpp
+	$(CC) $(CFLAGS) -Iarduino_src -c -o splash_fit_c.o arduino_src/splash_fit.c
+	g++ -o $@ splash_link_cpp.o splash_fit_c.o
+	rm -f splash_link_cpp.o splash_fit_c.o
+
+test: test_pet test_pmu test_splash_png test_splash_link
 	./test_pet
 	./test_pmu
 	./test_splash_png docs/splash-src.png /tmp/splash_card.ppm
 	python3 host/check_splash_ppm.py docs/splash-src.png /tmp/splash_card.ppm
+	./test_splash_link
 
 test-app: test_app
 	./test_app
@@ -59,6 +68,6 @@ round: round_preview
 	./round_preview out
 
 clean:
-	rm -rf test_pet test_pmu test_splash_png test_app test_clock test_blit host_golden round_preview out diff.png
+	rm -rf test_pet test_pmu test_splash_png test_splash_link splash_link_cpp.o splash_fit_c.o test_app test_clock test_blit host_golden round_preview out diff.png
 
 .PHONY: all test test-app test-clock test-blit golden round clean
