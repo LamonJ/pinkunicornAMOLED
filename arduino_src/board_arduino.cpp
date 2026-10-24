@@ -82,6 +82,9 @@ extern "C" {
  * missing library rather than an ordering mistake. Their own example puts
  * pin_config first for exactly this reason. */
 #include "pin_config.h"
+#include "SD_MMC.h"
+#include "pngle.h"
+#include "splash_fit.h"
 
 /* Belt and braces: pin_config.h defines this, but if it ever stops doing so
  * the failure is an inscrutable "XPowersPMU does not name a type" rather
@@ -394,6 +397,101 @@ static void show_splash(void)
     }
     gfx->draw16bitRGBBitmap(0, 0, buf, dw, dw);
     free(buf);
+}
+
+/* splash.png in the root of the microSD card. 1-bit SDMMC, the wiring this
+ * board actually has: clock GPIO2, command GPIO1, data GPIO3. */
+static splash_fit_t card_fit;
+
+static void on_png_init(pngle_t *png, uint32_t w, uint32_t h)
+{
+    (void)png;
+    if (!splash_fit_begin(&card_fit, card_fit.dst, w, h))
+        Serial.printf("splash: %ux%u is too big\n", w, h);
+}
+
+static void on_png_draw(pngle_t *png, uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+                        const uint8_t rgba[4])
+{
+    (void)png;
+    splash_fit_pixels(&card_fit, x, y, w, h, rgba);
+}
+
+static bool show_splash_from_card(void)
+{
+    static_assert((int)SPLASH_PANEL == (int)GFX_PANEL, "card splash fills the panel");
+    if (!SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA)) {
+        Serial.println("splash: sd pins failed");
+        return false;
+    }
+    /* true = 1-bit mode. There is no card-detect pin; a missing card fails
+     * this call and the built-in picture is used. 20 MHz, not the 40 MHz
+     * high-speed default: this slot is wired with one data line. Never
+     * format the card when the mount fails. */
+    if (!SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT)) {
+        Serial.println("splash: no card");
+        return false;
+    }
+    File file = SD_MMC.open("/splash.png", FILE_READ);
+    if (!file) {
+        Serial.println("splash: no splash.png");
+        SD_MMC.end();
+        return false;
+    }
+
+    uint16_t *frame = (uint16_t *)ps_malloc((size_t)SPLASH_PANEL * SPLASH_PANEL * sizeof(uint16_t));
+    uint8_t *buf = (uint8_t *)malloc(4096);
+    pngle_t *png = pngle_new();
+    bool ok = frame && buf && png;
+    if (ok) {
+        card_fit.dst = frame;
+        card_fit.bad = 0;
+        card_fit.wrote = 0;
+        card_fit.src_w = card_fit.src_h = 0;
+        pngle_set_init_callback(png, on_png_init);
+        pngle_set_draw_callback(png, on_png_draw);
+        pngle_set_user_data(png, &card_fit);
+        size_t have = 0;
+        while (ok && !card_fit.bad) {
+            size_t before = have;
+            if (have < 4096 && file.available()) {
+                size_t n = file.read(buf + have, 4096 - have);
+                if (n > 0) have += n;
+            }
+            if (have == 0) break;
+            int fed = pngle_feed(png, buf, have);
+            if (fed < 0) {
+                Serial.printf("splash: %s\n", pngle_error(png));
+                ok = false;
+                break;
+            }
+            /* 0 means the decoder needs a longer chunk than it is holding.
+             * Read more when the buffer grew and still has room. A full
+             * buffer, or a short read at the end of the file, cannot move. */
+            if (fed == 0) {
+                if (have > before && have < 4096 && file.available()) continue;
+                Serial.println("splash: png stalled");
+                ok = false;
+                break;
+            }
+            memmove(buf, buf + fed, have - (size_t)fed);
+            have -= (size_t)fed;
+        }
+        if (ok && !card_fit.bad && card_fit.wrote > 100 && card_fit.src_w) {
+            splash_fit_mask(&card_fit);
+            gfx->draw16bitRGBBitmap(0, 0, frame, SPLASH_PANEL, SPLASH_PANEL);
+            Serial.printf("splash: splash.png %ux%u\n", card_fit.src_w, card_fit.src_h);
+        } else {
+            ok = false;
+        }
+    }
+    if (png) pngle_destroy(png);
+    free(buf);
+    free(frame);
+    file.close();
+    SD_MMC.end();
+    if (!ok) Serial.println("splash: png failed, built-in picture");
+    return ok;
 }
 
 extern "C" void board_panel_push(const uint16_t *fb565)
@@ -967,10 +1065,13 @@ extern "C" void board_init(void)
          * roused. */
         gfx->displayOn();
         gfx->setBrightness((uint8_t)(35 * 255 / 100));
-        if (!init_quiet)
-            show_splash();
-        else
+        if (!init_quiet) {
             gfx->fillScreen(RGB565_BLACK);
+            if (!show_splash_from_card())
+                show_splash();
+        } else {
+            gfx->fillScreen(RGB565_BLACK);
+        }
     }
 
     /* Touch, exactly as their 10_Touch_CST9217 example does it. */

@@ -141,6 +141,8 @@ before the first flash.
 
 Turning the board on shows her picture, then the pet. The picture also comes back after the power has been lost.
 
+A microSD card in the slot can supply that picture. Format the card FAT32 and put `splash.png` in the top folder. The board reads it when the power comes back and shows it full size on the round glass. With no card, no file by that name, or a file that cannot be read, the built-in picture is used.
+
 ![Splash](docs/splash.png)
 
 Boot details still print on the serial monitor. If the frame buffer cannot be allocated, the glass shows that in red.

@@ -34,9 +34,14 @@ test_app: host/test_app.c host/board_host.c $(CORE) sprinkles/app.c
 test_pmu: host/test_pmu_hold.c arduino_src/pmu_hold.h
 	$(CC) $(CFLAGS) -o $@ host/test_pmu_hold.c
 
-test: test_pet test_pmu
+test_splash_png: host/test_splash_png.c arduino_src/splash_fit.c arduino_src/pngle.c arduino_src/miniz.c
+	$(CC) $(CFLAGS) -Iarduino_src -o $@ host/test_splash_png.c arduino_src/splash_fit.c arduino_src/pngle.c arduino_src/miniz.c
+
+test: test_pet test_pmu test_splash_png
 	./test_pet
 	./test_pmu
+	./test_splash_png docs/splash-src.png /tmp/splash_card.ppm
+	python3 host/check_splash_ppm.py docs/splash-src.png /tmp/splash_card.ppm
 
 test-app: test_app
 	./test_app
@@ -54,6 +59,6 @@ round: round_preview
 	./round_preview out
 
 clean:
-	rm -rf test_pet test_pmu test_app test_clock test_blit host_golden round_preview out diff.png
+	rm -rf test_pet test_pmu test_splash_png test_app test_clock test_blit host_golden round_preview out diff.png
 
 .PHONY: all test test-app test-clock test-blit golden round clean
