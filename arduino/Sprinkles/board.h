@@ -99,10 +99,11 @@ void board_touch_recover(void);
  *
  * 0 = BOOT (lower, GPIO0)   1 = PWR (upper, via the I2C expander)
  *
- * The case covers PWR. On the Arduino build that pin is not a nap button:
- * EXIO4 rises on its own and each edge was flipping her between nap and
- * wake. A dark screen is the nap. Holding PWR ~6 s still powers the board
- * off at the PMIC, and that timer is not something firmware can turn off. */
+ * The case covers PWR, and EXIO4 rises on its own, so a tap is not a nap.
+ * A steady three-second hold, after the line has been seen released,
+ * enters deep sleep. The lower button wakes that sleep. Holding PWR ~6 s
+ * still powers the board off at the PMIC. That timer is not writable from
+ * here. A dark screen is still the ordinary nap. */
 bool board_button_pressed(int which);      /* edge: true once per press */
 bool board_button_down(int which);         /* level: true while held     */
 

@@ -241,8 +241,8 @@ All implemented in `arduino_src/board_arduino.cpp`:
 | RTC | SensorLib `RtcDrv` / PCF85063, seeded from `__DATE__` if never set |
 | IMU | SensorLib `SensorQMI8658`, pickup by acceleration delta |
 | BOOT button | GPIO0, active low |
-| PWR button | The case covers it, so it is not a nap button. EXIO4 was chattering and flipping her between nap and wake. A dark screen is the nap. Holding the button about 6 seconds still powers the board off. |
-| Sleep | light sleep, wake on touch/BOOT, 2 s poll for pickup |
+| PWR button | Upper button, on EXIO4. A tap does nothing, because that line chatters. Hold it for 3 seconds and she deep-sleeps. Let go once the screen is dark. The lower button wakes her. Hold the upper button about 6 seconds and the chip still powers the board off. |
+| Sleep | Screen off is light sleep: a tap or the lower button wakes her. Holding the upper button for 3 seconds is deep sleep, and the lower button wakes that. |
 | Persistence | Preferences (NVS) |
 | Battery | AXP2101 via XPowersLib, the same charger setup PrintSphere uses on this board: temperature pin off, termination left on, 200 mA (theirs is 400; this cell is in a closed case), stop at 4.2 V. Bytes an earlier sketch rewrote are put back once at boot. The power chip is not rewritten while she runs. A cell already past 4.2 V sits idle. Below 3600 mV leave the cable in. From fully off, USB or a short press of the upper PWR button turns it on. Holding that button about 6 seconds turns the board off. Red wire to the + mark. |
 | Grown-up screen | both buttons held 5 s, native-resolution text |

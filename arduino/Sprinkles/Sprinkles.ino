@@ -29,6 +29,7 @@
 extern "C" {
 #include "app.h"
 #include "board.h"
+#include "pwr_sleep.h"
 }
 
 /* The save blob and all of its arithmetic now live in pet.c, where they can
@@ -244,7 +245,7 @@ void setup()
      * never gets mistaken for a broken one. */
     Serial.println("--- peripheral status ---");
     Serial.printf("display : %s\n", board_display_ok() ? "OK" : "FAIL");
-    Serial.println("PWR     : NOT IMPLEMENTED (needs EXIO4 expander read)");
+    Serial.println("PWR     : hold 3s = deep sleep, hold ~6s still powers off");
     Serial.printf ("touch   : %s\n", board_touch_ok() ? "OK" : "FAILED");
     Serial.printf ("audio   : %s%s\n", board_audio_ok() ? "OK" : "FAILED",
                    woke ? "  (this boot was a deep-sleep wake)" : "");
@@ -257,6 +258,7 @@ void setup()
     Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
     Serial.println("an egg does not mute; lift off the glass, then tap START");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
+    Serial.println("hold the upper button 3s = deep sleep | lower button wakes that");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",
                   GFX_W, GFX_W, GFX_W * GFX_SCALE, GFX_SCALE, GFX_OFFSET);
@@ -287,10 +289,11 @@ void loop()
      * The screen going dark is the other way she naps, which is the one
      * that works inside the case.
      *
-     * PWR is not read as a tap. The case covers it, and EXIO4 was rising
-     * on its own: every edge printed "[PWR] nap / wake" and flipped her
-     * while the moon was already full. Holding that button about six
-     * seconds still powers the board off at the chip. */
+     * PWR is not a tap. EXIO4 rises on its own, and those edges were
+     * flipping her nap. Three steady seconds, after the line has been
+     * seen up, is deep sleep. Holding on to about six seconds still
+     * powers the board off at the chip, and that timer is not changed.
+     * The lower button held with it is the grown-up screen instead. */
     #define HOLD_MS 400
     #define DEV_HOLD_MS 3000
     static bool     btn_down = false;
@@ -299,6 +302,18 @@ void loop()
 
     bool boot_down = board_button_down(0);
     bool pwr_down  = board_button_down(1);
+
+    /* Deep sleep on the way down, so she is already quiet before a longer
+     * hold reaches the chip's own power-off. Let go once the screen is
+     * dark if you want sleep rather than off. The lower button wakes her. */
+    static pwr_hold_t pwr_hold;
+    if (pwr_hold_step(&pwr_hold, now, pwr_down, boot_down, PWR_SLEEP_MS)) {
+        Serial.println("[PWR hold 3s] deep sleep - lower button wakes");
+        if (!app.awaiting_start) save_state();
+        static const spr_note_t night[] = { {440, 90} };
+        board_beep(night, 1);
+        board_deep_sleep();          /* never returns */
+    }
 
     /* Both buttons together for three seconds OPENS the grown-up screen.
      * It only ever opens - closing is a single press, below - because a

@@ -101,6 +101,7 @@ extern "C" {
 #include "board.h"
 #include "gfx.h"
 #include "wallclock.h"
+#include "pwr_sleep.h"
 }
 
 /* ---- TCA9554 I/O expander ----------------------------------------------
@@ -621,10 +622,9 @@ extern "C" bool board_button_pressed(int which)
         boot_last = now;
         return pressed;
     }
-    /* Do not turn EXIO4 into a press. The case covers this button, and the
-     * line rises by itself. Acting on those edges flipped nap on and off
-     * with the screen still lit. board_button_down(1) is still the level,
-     * for the grown-up screen. The six-second power-off stays in the chip. */
+    /* Do not turn EXIO4 into a tap. The line rises by itself, and those
+     * edges flipped her nap. A three-second level is deep sleep, in the
+     * main loop. The six-second power-off stays in the chip. */
     (void)which;
     return false;
 }
@@ -856,7 +856,10 @@ extern "C" void board_deep_sleep(void)
 #endif
 
     /* BOOT is the only wake source. PWR cannot be one - it lives behind the
-     * I2C expander - and neither can the IMU, whose INT1 is on expander P6. */
+     * I2C expander - and neither can the IMU, whose INT1 is on expander P6.
+     * Light sleep may have left its 500 ms timer armed. A deep sleep with
+     * that timer still on would reboot every half second. */
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     gpio_hold_en((gpio_num_t)PA);
     if (rtc_gpio_is_valid_gpio((gpio_num_t)PIN_BOOT)) {
         rtc_gpio_pullup_en((gpio_num_t)PIN_BOOT);
@@ -922,6 +925,10 @@ extern "C" void board_sleep_until_touched(void)
     /* A stuck-low TP_INT would otherwise wake light sleep the instant it
      * starts, forever. After one ghost, listen only to BOOT plus the timer. */
     bool trust_touch = true;
+    /* Fresh for this nap. A hold has to last three seconds inside the
+     * dark screen, not inherit a stale start time from the last one. */
+    pwr_hold_t pwr_hold;
+    memset(&pwr_hold, 0, sizeof pwr_hold);
 
     for (;;) {
         esp_sleep_enable_ext1_wakeup(trust_touch ? touch_and_boot : boot_only,
@@ -931,13 +938,22 @@ extern "C" void board_sleep_until_touched(void)
 
         esp_sleep_wakeup_cause_t why = esp_sleep_get_wakeup_cause();
 
-        if (board_button_down(0)) break;
+        /* The same three-second rule as the awake loop. Time comes from
+         * the RTC because light sleep stops millis(). One high sample is
+         * not a hold. The lower button still wakes the screen. */
+        {
+            int boot = board_button_down(0);
+            int pwr = board_button_down(1);
+            int64_t rtc_now = (int64_t)(esp_rtc_get_time_us() / 1000);
+            if (pwr_hold_step(&pwr_hold, rtc_now, pwr, boot, PWR_SLEEP_MS)) {
+                Serial.println("[PWR hold 3s] deep sleep - lower button wakes");
+                board_deep_sleep();
+            }
+            if (boot) break;
+        }
 #if SLEEP_PICKUP_POLL
         if (board_picked_up()) break;                  /* lifted */
 #endif
-        /* PWR is not a reason to light the screen. The case covers it, and
-         * one high sample on EXIO4 was enough to end this sleep and start
-         * the nap/wake loop again. */
         /* Timer or interrupt: a real finger is still down. One sample is
          * not enough — the panel-off edge looks like a contact. */
         if (finger_still_down()) break;

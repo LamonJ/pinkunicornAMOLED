@@ -14,7 +14,7 @@ OUT  = os.path.join(ROOT, "arduino", "Sprinkles")
 
 SHARED = ["gfx.h", "gfx.c", "pet.h", "pet.c",
           "sprites.h", "sprites.c", "app.h", "app.c", "board.h",
-          "wallclock.h", "wallclock.c"]
+          "wallclock.h", "wallclock.c", "pwr_sleep.h", "pwr_sleep.c"]
 EXTRA  = [("arduino_src/Sprinkles.ino",     "Sprinkles.ino"),
           ("arduino_src/board_arduino.cpp", "board_arduino.cpp"),
           ("arduino_src/pmu_hold.h",        "pmu_hold.h"),
