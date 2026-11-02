@@ -164,6 +164,7 @@ bool board_touch(double *wx, double *wy)
 }
 
 bool board_touch_ok(void) { return false; }   /* TODO(bsp) */
+void board_touch_recover(void) {}             /* TODO(bsp) */
 bool board_rtc_ok(void)   { return false; }   /* TODO(bsp) */
 bool board_imu_ok(void)   { return false; }   /* TODO(bsp) */
 bool board_audio_ok(void) { return false; }   /* TODO(bsp) */

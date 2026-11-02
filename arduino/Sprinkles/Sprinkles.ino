@@ -255,6 +255,7 @@ void setup()
                   app.awaiting_start ? "START button, egg has not begun" :
                                        "keep saved pet");
     Serial.println("tap the top = feed | tap the bottom = sweep | hold her = mute");
+    Serial.println("an egg does not mute; lift off the glass, then tap START");
     Serial.println("BOOT tap = menu | dark screen = nap | a tap wakes her");
     Serial.println("-------------------------");
     Serial.printf("world %dx%d -> %d px at %dx, offset %d\n",
@@ -263,7 +264,15 @@ void setup()
         /* She notices you, exactly as she would have on a light-sleep wake. */
         app_picked_up(&app, now);
     } else {
-        delay(1500);            /* long enough to see the splash */
+        /* Keep reading the touch chip while the picture is up. A 1.5 s
+         * pause with no read leaves a contact in the controller, and the
+         * lift of that contact was pressing Start. */
+        int64_t splash_until = board_now_ms() + 1500;
+        while (board_now_ms() < splash_until) {
+            double sx, sy;
+            (void)board_touch(&sx, &sy);
+            delay(40);
+        }
     }
 }
 
@@ -407,6 +416,32 @@ after_input:;
      * time limit and get thrown away. A finished mute hold is the exception. */
     double tx = 0, ty = 0;
     bool down = board_touch(&tx, &ty);
+    /* A real finger jitters. One raw point that does not move for a few
+     * seconds is the controller repeating a contact it was never asked
+     * about, and every later tap waits for a lift that never comes. */
+    static int     stuck_x = -2, stuck_y = -2;
+    static int64_t stuck_at = 0;
+    bool touch_reset = false;
+    if (!down) {
+        stuck_x = -2;
+        stuck_y = -2;
+        stuck_at = 0;
+    } else if (board_touch_raw_x != stuck_x || board_touch_raw_y != stuck_y) {
+        stuck_x = board_touch_raw_x;
+        stuck_y = board_touch_raw_y;
+        stuck_at = now;
+    } else if (stuck_at != 0 && now - stuck_at >= 3000) {
+        Serial.println("[touch] stuck contact, resetting");
+        board_touch_recover();
+        app.hold_down = false;
+        app.hold_fired = false;
+        down = false;
+        touch_was_down = false;
+        touch_reset = true;
+        stuck_x = -2;
+        stuck_y = -2;
+        stuck_at = 0;
+    }
     if (down) { last_x = tx; last_y = ty; }
     if (down && !touch_was_down) { down_x = tx; down_y = ty; }
     if (down && app_hold(&app, now, 1, tx, ty)) {
@@ -440,6 +475,11 @@ after_input:;
             last_save = now;
         }
     }
+    /* Arm on a frame that is already up, not on the frame a finger lifts.
+     * The lift itself is the tap, and an unarmed tap cannot press Start.
+     * A reset frame is not that clear frame: the finger may still be there. */
+    if (!touch_reset && !down && !touch_was_down)
+        app_arm_start(&app);
     touch_was_down = down;
 
     /* ---- state ---- */
@@ -521,6 +561,8 @@ after_input:;
          * paint one frame and go straight back to sleep. */
         app_touch(&app, board_now_ms(), 0, 0);
         touch_was_down = false;
+        stuck_at = 0;
+        stuck_x = stuck_y = -2;
         last_frame = last_save = board_now_ms();
 #endif
     } else {

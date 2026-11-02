@@ -624,6 +624,16 @@ static void test_hold_mutes(void)
     app_touch(&A, hb_now + APP_HOLD_MS + 80, 32, 50);
     CHECK(A.pet.stage == ST_EGG, "hatch still starts an egg");
     CHECK(!A.pet.sound, "and the speaker stays muted");
+
+    boot(ST_EGG);
+    A.pet.sound = true;
+    CHECK(!app_hold(&A, hb_now, 1, 32, 40), "finger down on the egg");
+    CHECK(!app_hold(&A, hb_now + APP_HOLD_MS + 500, 1, 32, 40),
+          "holding the egg does not mute");
+    CHECK(A.pet.sound, "the egg stays heard");
+    CHECK(!A.hold_fired, "an egg hold is not a finished mute");
+    app_hold(&A, hb_now + APP_HOLD_MS + 600, 0, 0, 0);
+    CHECK(!A.hold_fired, "letting go of the egg can still knock");
 }
 
 /* Full bars still take a cake. Each one costs a heart. The fourth kills,
@@ -811,6 +821,13 @@ static void test_start_button_holds_the_egg(void)
     CHECK(A.awaiting_start, "the tap that lights the glass is not Start");
     CHECK(!A.screen_off, "the picture is back");
 
+    app_touch(&A, hb_now, 32, 32);
+    CHECK(A.awaiting_start, "a touch already on the glass is not Start");
+    CHECK(A.pet.born_ms == born, "her clock still has not begun");
+
+    app_arm_start(&A);
+    app_touch(&A, hb_now, 4, 60);
+    CHECK(A.awaiting_start, "armed, a miss still waits");
     app_touch(&A, hb_now, 32, 32);
     CHECK(!A.awaiting_start, "the button begins her");
     CHECK(A.pet.stage == ST_EGG, "and she is an egg");

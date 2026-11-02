@@ -60,8 +60,11 @@ typedef struct {
     bool    dev_menu;            /* grown-up diagnostics, both buttons 5 s  */
 
     /* START_AS_EGG 1. The egg is on screen and her clock is not running
-     * until the Start button is pressed. */
+     * until the Start button is pressed. start_armed becomes true only
+     * after a frame with no finger, so a contact that was already on the
+     * glass when the button appeared cannot press it. */
     bool    awaiting_start;
+    bool    start_armed;
 
     int64_t last_pet_tick_ms;
 
@@ -87,6 +90,8 @@ void app_init(app_t *a, int64_t now_ms);
 int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
                          const char *build_stamp);
 void app_wait_for_start(app_t *a);
+/* Call on a frame where no finger is down and none just lifted. */
+void app_arm_start(app_t *a);
 
 /* Call about once a second. Advances needs and rolls for spontaneous
  * behaviour. */
@@ -103,7 +108,8 @@ void app_frame(app_t *a, double t, int64_t now_ms);
 void app_touch(app_t *a, int64_t now_ms, double wx, double wy);
 
 /* Call every frame with the finger state. A still hold of APP_HOLD_MS
- * toggles the speaker and returns true on that frame only. */
+ * toggles the speaker and returns true on that frame only. An egg does
+ * not mute: the hold that hatches her is not a speaker button. */
 #define APP_HOLD_MS 800
 bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y);
 void app_button(app_t *a, int64_t now_ms, int which);   /* 0 top, 1 bottom */

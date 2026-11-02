@@ -239,12 +239,34 @@ static void amp_enable(bool on)
     digitalWrite(PA, on ? HIGH : LOW);
 }
 
+/* Defined with the touch driver. A chime used to block for the whole note
+ * without reading the CST9217, and the chip then kept reporting one point. */
+static void touch_keepalive(void);
+
+/* Write in slices so the touch chip is acknowledged during a chime.
+ * A short note stays one write. A long one, the birthday hold especially,
+ * used to sit on the bus long enough for the task watchdog and long enough
+ * for the CST9217 to keep repeating one point. */
+static void write_pcm(const uint8_t *bytes, size_t nbytes)
+{
+    const size_t chunk = (size_t)(AUDIO_RATE / 10) * 2 * sizeof(int16_t);
+    size_t off = 0;
+    while (off < nbytes) {
+        size_t n = nbytes - off;
+        if (n > chunk) n = chunk;
+        i2s.write((uint8_t *)(bytes + off), n);
+        off += n;
+        touch_keepalive();
+        delay(1);
+    }
+}
+
 static void write_silence(int ms)
 {
     int frames = ms * AUDIO_RATE / 1000;
     if (frames > NOTE_MAX_FRAMES) frames = NOTE_MAX_FRAMES;
     memset(note_buf, 0, (size_t)frames * 2 * sizeof(int16_t));
-    i2s.write((uint8_t *)note_buf, (size_t)frames * 2 * sizeof(int16_t));
+    write_pcm((const uint8_t *)note_buf, (size_t)frames * 2 * sizeof(int16_t));
 }
 
 extern "C" void board_audio_enable(bool on) { audio_on = on; }
@@ -332,10 +354,7 @@ extern "C" void board_beep(const spr_note_t *notes, int count)
             note_buf[i * 2]     = v;
             note_buf[i * 2 + 1] = v;
         }
-        i2s.write((uint8_t *)note_buf, (size_t)frames * 2 * sizeof(int16_t));
-        /* A birthday song is many seconds. delay() keeps the task watchdog
-         * fed between notes; a bare 13 s write would reset the board. */
-        delay(1);
+        write_pcm((const uint8_t *)note_buf, (size_t)frames * 2 * sizeof(int16_t));
     }
 
     write_silence(15);                  /* let the tail out before muting */
@@ -553,6 +572,32 @@ extern "C" bool board_touch(double *wx, double *wy)
 }
 
 extern "C" bool board_touch_ok(void) { return touch_ok; }
+
+static void touch_keepalive(void)
+{
+    if (!touch_ok) return;
+    int16_t x[1] = {0}, y[1] = {0};
+    (void)touch.getPoint(x, y, 1);
+}
+
+extern "C" void board_touch_recover(void)
+{
+    if (!touch_ok) return;
+    /* reset() pulses TP_RESET. The mirror and the coordinate range live in
+     * the driver, not the chip, but a reset is the moment they were first
+     * applied, so put them back before the next read. */
+    touch.reset();
+    delay(50);
+    touch.setMaxCoordinates(LCD_WIDTH, LCD_HEIGHT);
+    touch.setMirrorXY(true, true);
+    pinMode(TP_INT, INPUT_PULLUP);
+    for (int i = 0; i < 3; i++) {
+        int16_t x[1] = {0}, y[1] = {0};
+        (void)touch.getPoint(x, y, 1);
+        delay(20);
+    }
+    board_touch_raw_x = board_touch_raw_y = -1;
+}
 
 /* ---- buttons ----------------------------------------------------------- */
 static bool boot_last = true;      /* GPIO0 idles high */
@@ -1088,6 +1133,13 @@ extern "C" void board_init(void)
         touch.setMaxCoordinates(LCD_WIDTH, LCD_HEIGHT);
         touch.setMirrorXY(true, true);
         pinMode(TP_INT, INPUT_PULLUP);
+        /* begin() leaves whatever was on the glass sitting in the chip.
+         * Drop those points before the splash hold reads them as a press. */
+        for (int i = 0; i < 4; i++) {
+            int16_t x[1] = {0}, y[1] = {0};
+            (void)touch.getPoint(x, y, 1);
+            delay(20);
+        }
         Serial.printf("touch OK: %s, %u points\n",
                       touch.getModelName(),
                       (unsigned)touch.getSupportTouchPoint());

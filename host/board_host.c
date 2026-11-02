@@ -49,6 +49,7 @@ void board_panel_push(const uint16_t *fb) { (void)fb; hb_pushes++; }
 void board_brightness(int p) { hb_brightness = p; }
 bool board_touch(double *x, double *y) { (void)x; (void)y; return false; }
 bool board_touch_ok(void) { return false; }
+void board_touch_recover(void) {}
 bool board_rtc_ok(void) { return false; }
 bool board_imu_ok(void) { return false; }
 bool board_audio_ok(void) { return false; }

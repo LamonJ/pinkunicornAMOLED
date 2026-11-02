@@ -89,6 +89,11 @@ void board_brightness(int percent);            /* 0..100 */
  * Returns false when nothing is down. */
 bool board_touch(double *wx, double *wy);
 
+/* Pulse the controller and throw away the points it reports right after.
+ * The Arduino loop calls this when one raw point has not moved for a few
+ * seconds, which is a stuck reading rather than a finger. */
+void board_touch_recover(void);
+
 /* CONFIRMED ON HARDWARE: BOOT is the LOWER side button, PWR is the upper one.
  * (I originally had this backwards, inferred from the product render.)
  *

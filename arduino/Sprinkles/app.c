@@ -101,6 +101,13 @@ int app_gift_needs_start(int start_as_egg, const char *saved_stamp,
 void app_wait_for_start(app_t *a)
 {
     a->awaiting_start = true;
+    a->start_armed = false;
+}
+
+void app_arm_start(app_t *a)
+{
+    if (a->awaiting_start)
+        a->start_armed = true;
 }
 
 void app_init(app_t *a, int64_t now_ms)
@@ -619,6 +626,14 @@ static bool on_start_button(double wx, double wy)
 bool app_hold(app_t *a, int64_t now_ms, int down, double x, double y)
 {
     if (a->awaiting_start) return false;
+    /* The egg's press is a knock. A finger that stayed down after Start
+     * was reaching the 800 ms mute on the very next frames, so the toy
+     * went quiet by itself and later taps made no sound. */
+    if (a->pet.stage == ST_EGG) {
+        a->hold_down = false;
+        a->hold_fired = false;
+        return false;
+    }
     if (!down) {
         a->hold_down = false;
         a->hold_fired = false;
@@ -675,6 +690,9 @@ void app_touch(app_t *a, int64_t now_ms, double wx, double wy)
             return;
         }
         a->idle_last_ms = now_ms;
+        /* A finger already on the glass when the button appears lifts
+         * inside this big target. That lift is not a press. */
+        if (!a->start_armed) return;
         if (!on_start_button(wx, wy)) return;
         /* Her clock starts at this press, not at boot and not at flash. */
         app_init(a, now_ms);
