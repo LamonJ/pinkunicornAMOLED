@@ -175,9 +175,14 @@ static void draw_dev_screen(int64_t now)
 void setup()
 {
     Serial.begin(115200);
-    /* A charger is not a serial monitor. Prints must not stall the toy
-     * when nothing is reading them. */
+    /* A charger is not a serial monitor. USB CDC waits forever on a full
+     * transmit buffer when nothing is reading, which freezes the toy.
+     * Core 3.3.12 has setTxTimeoutMs on the USB port only. With USB CDC
+     * off, Serial is the UART and that call does not exist. The UART
+     * clocks bytes out with or without a monitor. */
+#if ARDUINO_USB_CDC_ON_BOOT
     Serial.setTxTimeoutMs(0);
+#endif
     /* Native USB needs a moment for the host to attach, and anything printed
      * before that is simply lost. Wait, but never block forever - the device
      * has to work with nothing plugged in. */
